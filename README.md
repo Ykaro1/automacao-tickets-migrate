@@ -1,6 +1,6 @@
 # Automação de Monitoramento de Tickets
 
-Este script automatiza o monitoramento de tickets no sistema Migrate, enviando notificações para o Slack quando houver atualizações.
+Este script automatiza o monitoramento de tickets em um sistema, enviando notificações para o Slack quando houver atualizações.
 
 ## Configuração
 
@@ -8,8 +8,8 @@ Este script automatiza o monitoramento de tickets no sistema Migrate, enviando n
 
 O script requer as seguintes variáveis de ambiente para funcionar:
 
-- `MIGRATE_EMAIL`: Email de acesso ao Migrate
-- `MIGRATE_SENHA`: Senha de acesso ao Migrate
+- `MIGRATE_EMAIL`: Email de acesso ao sistema
+- `MIGRATE_SENHA`: Senha de acesso ao sistema
 - `GOOGLE_AI_API_KEY`: Chave da API do Google AI (Gemini)
 - `SLACK_WEBHOOK_URL`: URL do webhook do Slack
 - `SLACK_CHANNEL`: ID do canal do Slack
