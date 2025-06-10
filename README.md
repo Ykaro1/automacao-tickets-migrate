@@ -4,34 +4,16 @@ Este script automatiza o monitoramento de tickets em um sistema, enviando notifi
 
 ## Configuração
 
-### Variáveis de Ambiente Necessárias
-
-O script requer as seguintes variáveis de ambiente para funcionar:
-
-- `MIGRATE_EMAIL`: Email de acesso ao sistema
-- `MIGRATE_SENHA`: Senha de acesso ao sistema
-- `GOOGLE_AI_API_KEY`: Chave da API do Google AI (Gemini)
-- `SLACK_WEBHOOK_URL`: URL do webhook do Slack
-- `SLACK_CHANNEL`: ID do canal do Slack
-
 ### Configuração no GitHub Actions
 
 1. Acesse seu repositório no GitHub
 2. Vá para Settings > Secrets and variables > Actions
 3. Clique em "New repository secret"
-4. Adicione cada uma das variáveis acima como um secret
+4. Adicione cada uma das variáveis necessárias como um secret
 
 ### Configuração Local
 
-Para desenvolvimento local, você pode criar um arquivo `.env` na raiz do projeto com as seguintes variáveis:
-
-```env
-MIGRATE_EMAIL=seu_email@exemplo.com
-MIGRATE_SENHA=sua_senha
-GOOGLE_AI_API_KEY=sua_chave_api
-SLACK_WEBHOOK_URL=sua_url_webhook
-SLACK_CHANNEL=seu_canal
-```
+Para desenvolvimento local, você pode criar um arquivo `.env` na raiz do projeto com as variáveis necessárias.
 
 ## Execução
 
