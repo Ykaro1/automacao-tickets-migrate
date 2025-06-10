@@ -1,0 +1,22 @@
+# Arquivos de ambiente
+.env
+
+# Arquivos Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos de download
+downloads/
+
+# Arquivos de dados
+*.csv
+*.xlsx
+*.xls
+
+# Logs
+*.log
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db 
