@@ -27,30 +27,27 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
         
-    - name: Install Chrome
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y wget gnupg2
-        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-        sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
-        
-    - name: Install ChromeDriver
+    - name: Install Chrome and ChromeDriver
       run: |
         # Instalar Chrome for Testing
-        CHROME_VERSION=$(google-chrome --version | sed 's/Google Chrome \([0-9]*\).*/\1/')
-        echo "Chrome major version: $CHROME_VERSION"
+        CHROME_VERSION="137.0.7151.70"
+        CHROME_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64/chrome-linux64.zip"
+        CHROMEDRIVER_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64/chromedriver-linux64.zip"
         
-        # Baixar ChromeDriver do Chrome for Testing
-        CHROMEDRIVER_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/119.0.6045.105/linux64/chromedriver-linux64.zip"
+        # Baixar e instalar Chrome
+        wget -q "$CHROME_URL" -O chrome.zip
+        unzip chrome.zip
+        sudo mv chrome-linux64/* /usr/local/bin/
+        
+        # Baixar e instalar ChromeDriver
         wget -q "$CHROMEDRIVER_URL" -O chromedriver.zip
         unzip chromedriver.zip
-        
-        # Mover ChromeDriver para o diretório correto
         sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
         sudo chmod +x /usr/local/bin/chromedriver
-        chromedriver --version
+        
+        # Verificar versões
+        echo "Chrome version: $(google-chrome --version)"
+        echo "ChromeDriver version: $(chromedriver --version)"
         
     - name: Install Python dependencies
       run: |
@@ -72,7 +69,7 @@ jobs:
         SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
         # Configurações adicionais para ambiente headless
         DISPLAY: :99
-        CHROME_BIN: /usr/bin/google-chrome
+        CHROME_BIN: /usr/local/bin/google-chrome
       run: |
         # Iniciar display virtual para testes headless
         export DISPLAY=:99
