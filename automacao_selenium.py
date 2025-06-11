@@ -263,14 +263,25 @@ def analisar_e_notificar_mudancas(df_atual):
 
     print("\n--- ETAPA 2: ANALISANDO TICKETS E DETECTANDO RESPOSTAS EXTERNAS ---")
 
-    status_excluidos = ["Fechado", "Resolvido"]
-    df_ativos = df_atual[~df_atual['Status'].str.title().isin(status_excluidos)].copy()
+    # Lista de status que indicam tickets não ativos
+    status_excluidos = ["Fechado", "Resolvido", "Cancelado", "Concluído"]
     
+    # Converte todos os status para título (primeira letra maiúscula)
+    df_atual['Status'] = df_atual['Status'].str.title()
+    
+    # Filtra os tickets ativos
+    df_ativos = df_atual[~df_atual['Status'].isin(status_excluidos)].copy()
+    
+    # Extrai o autor da última ação
     df_ativos['Autor da Última Ação'] = df_ativos['Ações'].apply(lambda x: extrair_ultima_acao_e_autor(x)[1])
 
     print(f"Encontrados {len(df_ativos)} tickets ativos.")
+    print("Status dos tickets ativos:")
+    print(df_ativos['Status'].value_counts())
+    
     if df_ativos.empty:
-        if os.path.exists(ARQUIVO_ACOMPANHAMENTO): os.remove(ARQUIVO_ACOMPANHAMENTO)
+        if os.path.exists(ARQUIVO_ACOMPANHAMENTO): 
+            os.remove(ARQUIVO_ACOMPANHAMENTO)
         return
 
     colunas_acompanhamento = ['Número', 'Data da última ação']
