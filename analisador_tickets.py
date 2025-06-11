@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 import google.generativeai as genai
 import requests
 from dotenv import load_dotenv
+import subprocess
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -31,10 +32,13 @@ logging.basicConfig(
 
 class TicketAnalyzer:
     def __init__(self):
-        self.memory_file = Path("acompanhamento_tickets.json")
+        self.memory_file = Path("data/ticket_memory.json")
         self.autores_internos = os.getenv("AUTORES_INTERNOS", "").split(",")
         self.slack_webhook = os.getenv("SLACK_WEBHOOK_URL")
         self.slack_channel = os.getenv("SLACK_CHANNEL")
+        
+        # Garante que o diretório data existe
+        self.memory_file.parent.mkdir(exist_ok=True)
         
         # Carrega ou cria arquivo de memória
         self.memory = self._load_memory()
@@ -47,9 +51,38 @@ class TicketAnalyzer:
         return {}
     
     def _save_memory(self):
-        """Salva o arquivo de memória."""
+        """Salva o arquivo de memória e faz commit no GitHub."""
+        # Salva o arquivo
         with open(self.memory_file, 'w', encoding='utf-8') as f:
             json.dump(self.memory, f, ensure_ascii=False, indent=2)
+        
+        # Configura o Git
+        try:
+            # Configura o usuário do Git
+            subprocess.run(['git', 'config', '--global', 'user.email', 'github-actions@github.com'], check=True)
+            subprocess.run(['git', 'config', '--global', 'user.name', 'GitHub Actions'], check=True)
+            
+            # Adiciona o arquivo de memória
+            subprocess.run(['git', 'add', str(self.memory_file)], check=True)
+            
+            # Verifica se há mudanças
+            result = subprocess.run(['git', 'diff', '--staged', '--quiet'], capture_output=True)
+            if result.returncode == 1:  # Há mudanças
+                # Faz o commit
+                subprocess.run([
+                    'git', 'commit', 
+                    '-m', f'chore: atualiza memória de tickets - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+                ], check=True)
+                
+                # Faz o push
+                subprocess.run(['git', 'push'], check=True)
+                logging.info("Memória atualizada e enviada para o GitHub")
+            else:
+                logging.info("Nenhuma mudança na memória para commitar")
+                
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Erro ao salvar memória no GitHub: {str(e)}")
+            # Continua mesmo com erro, pois o arquivo local foi salvo
     
     def _get_last_action(self, actions_text: str) -> Optional[str]:
         """Extrai a última ação do texto de ações."""

@@ -1,15 +1,9 @@
-name: Automação Tickets Migrate
+name: Automação de Tickets
 
 on:
   schedule:
-    - cron: '0 8,14 * * *'  # Executa às 8h e 14h todos os dias
-  workflow_dispatch:
-    inputs:
-      debug_mode:
-        description: 'Executar em modo debug'
-        required: false
-        type: boolean
-        default: false
+    - cron: '0 */4 * * *'  # Roda a cada 4 horas
+  workflow_dispatch:  # Permite execução manual
 
 env:
   PYTHON_VERSION: '3.11'
@@ -20,48 +14,55 @@ jobs:
   automacao:
     runs-on: ubuntu-latest
     
+    permissions:
+      contents: write  # Permissão para fazer push
+    
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Configurar Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        cache: 'pip'
-    
-    - name: Instalar dependências
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Configurar Chrome
-      run: |
-        wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-        sudo dpkg -i google-chrome-stable_current_amd64.deb || true
-        sudo apt-get update
-        sudo apt-get install -y -f
-        google-chrome --version
-    
-    - name: Configurar ChromeDriver
-      run: |
-        wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${{ env.CHROME_VERSION }}/linux64/chromedriver-linux64.zip"
-        unzip chromedriver-linux64.zip
-        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
-        chromedriver --version
-    
-    - name: Criar diretórios necessários
-      run: |
-        mkdir -p downloads logs screenshots
-    
-    - name: Executar automação
-      env:
-        MIGRATE_EMAIL: ${{ secrets.MIGRATE_EMAIL }}
-        MIGRATE_SENHA: ${{ secrets.MIGRATE_SENHA }}
-        DEBUG_MODE: ${{ inputs.debug_mode }}
-      run: |
-        python automacao_selenium.py
-    
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Necessário para o git push funcionar
+      
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Configurar Chrome
+        run: |
+          wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb || true
+          sudo apt-get update
+          sudo apt-get install -y -f
+          google-chrome --version
+      
+      - name: Configurar ChromeDriver
+        run: |
+          wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${{ env.CHROME_VERSION }}/linux64/chromedriver-linux64.zip"
+          unzip chromedriver-linux64.zip
+          sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
+          sudo chmod +x /usr/local/bin/chromedriver
+          chromedriver --version
+      
+      - name: Criar diretórios necessários
+        run: |
+          mkdir -p downloads logs screenshots
+      
+      - name: Executar automação
+        env:
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+          AUTORES_INTERNOS: ${{ secrets.AUTORES_INTERNOS }}
+        run: |
+          python automacao_selenium.py
+          python analisador_tickets.py
+      
     - name: Verificar arquivo CSV
       run: |
         if [ ! -f "downloads/file.csv" ]; then
