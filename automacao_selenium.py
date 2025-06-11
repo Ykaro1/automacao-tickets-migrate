@@ -76,6 +76,11 @@ def iniciar_navegador():
         if not os.path.exists(download_dir):
             os.makedirs(download_dir)
         
+        # Configura o diretório de dados do usuário
+        user_data_dir = os.path.abspath("chrome_data")
+        if not os.path.exists(user_data_dir):
+            os.makedirs(user_data_dir)
+        
         # Configura as opções do Chrome
         chrome_options = Options()
         chrome_options.add_argument("--start-maximized")  # Maximiza a janela
@@ -83,6 +88,8 @@ def iniciar_navegador():
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+        chrome_options.add_argument("--remote-debugging-port=9222")
         
         # Configura o diretório de downloads
         prefs = {
