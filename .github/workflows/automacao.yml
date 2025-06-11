@@ -38,6 +38,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pyarrow  # Instala pyarrow para evitar o aviso do pandas
       
       - name: Configurar Chrome
         run: |
@@ -57,10 +58,14 @@ jobs:
       
       - name: Criar diretórios necessários
         run: |
-          mkdir -p downloads logs screenshots
+          mkdir -p downloads
+          mkdir -p logs
+          mkdir -p data
       
       - name: Executar automação
         env:
+          MIGRATE_EMAIL: ${{ secrets.MIGRATE_EMAIL }}
+          MIGRATE_SENHA: ${{ secrets.MIGRATE_SENHA }}
           GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
@@ -69,3 +74,17 @@ jobs:
         run: |
           python automacao_selenium.py
           python analisador_tickets.py
+      
+      - name: Verificar arquivos gerados
+        run: |
+          if [ ! -f "downloads/file.csv" ]; then
+            echo "❌ Arquivo CSV não foi gerado"
+            exit 1
+          fi
+          echo "✅ Arquivo CSV gerado com sucesso"
+      
+      - name: Limpar arquivos temporários
+        if: always()
+        run: |
+          rm -f downloads/file.xlsx  # Remove apenas o XLSX, mantém o CSV
+          rm -f screenshots/* 2>/dev/null || true
