@@ -10,14 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout do código
+      uses: actions/checkout@v4
     
-    - name: Set up Python
+    - name: Configurar Python com cache
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+        cache: 'pip'
     
-    - name: Install Chrome
+    - name: Instalar Google Chrome
       run: |
         sudo apt-get update
         sudo apt-get install -y wget gnupg2
@@ -27,46 +29,51 @@ jobs:
         sudo apt-get install -y google-chrome-stable
         google-chrome --version
     
-    - name: Install ChromeDriver
+    - name: Instalar ChromeDriver compatível
       run: |
-        CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d'.' -f1)
-        echo "Chrome version: $CHROME_VERSION"
-        CHROMEDRIVER_VERSION="137.0.7151.70"
-        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
-        wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
+        # Obter a versão completa do Chrome instalado
+        CHROME_VERSION=$(google-chrome --version)
+        echo "Versão do Chrome encontrada: $CHROME_VERSION"
+
+        # Extrair a versão exata para o driver (ex: 125.0.6422.141)
+        CHROME_DRIVER_VERSION=$(echo "$CHROME_VERSION" | awk '{print $3}')
+        echo "Versão compatível do ChromeDriver para baixar: $CHROME_DRIVER_VERSION"
+
+        # Baixar a versão correspondente do ChromeDriver
+        wget -q "https://storage.googleapis.com/chrome-for-testing-public/$CHROME_DRIVER_VERSION/linux64/chromedriver-linux64.zip"
+        
         unzip chromedriver-linux64.zip
         sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
         sudo chmod +x /usr/local/bin/chromedriver
         chromedriver --version
     
-    - name: Install dependencies
+    - name: Instalar dependências Python
       run: |
         python -m pip install --upgrade pip
-        pip install --no-cache-dir -r requirements.txt
-        pip install --no-cache-dir openpyxl==3.1.2
+        pip install -r requirements.txt
         pip list
     
-    - name: Create .env file
+    - name: Criar arquivo .env com secrets
       run: |
         echo "MIGRATE_EMAIL=${{ secrets.MIGRATE_EMAIL }}" >> .env
         echo "MIGRATE_SENHA=${{ secrets.MIGRATE_SENHA }}" >> .env
     
-    - name: Create downloads directory
+    - name: Criar diretório de downloads
       run: mkdir -p downloads
     
-    - name: Run automation
+    - name: Executar automação com Selenium
       run: |
         python automacao_selenium.py
         ls -la downloads/
     
-    - name: Upload Excel file
+    - name: Fazer upload do arquivo Excel gerado
       uses: actions/upload-artifact@v4
       with:
         name: tickets-excel
         path: downloads/*.xlsx
         if-no-files-found: warn
     
-    - name: Upload error screenshot
+    - name: Fazer upload do screenshot em caso de erro
       if: failure()
       uses: actions/upload-artifact@v4
       with:
