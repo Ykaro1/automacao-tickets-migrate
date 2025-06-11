@@ -72,27 +72,28 @@ def login_e_download(driver, email, senha):
     """Realiza o login na plataforma e faz o download do relatório de tickets."""
     try:
         print("Iniciando o navegador Chrome em modo headless...")
-        driver.get("https://app.migrate.com.br/relatorios")
+        # Corrigindo a URL para o domínio correto
+        driver.get("https://atendimento.migrate.com.br/Ticket")
         time.sleep(15)  # Aumentado para 15 segundos
         
         print("Inserindo credenciais...")
         # Aguarda e preenche o campo de email
         email_input = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.ID, "email"))
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input.username-input-login-service"))
         )
         email_input.clear()
         email_input.send_keys(email)
         
         # Aguarda e preenche o campo de senha
         senha_input = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.ID, "password"))
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input.password-input-login-service"))
         )
         senha_input.clear()
         senha_input.send_keys(senha)
         
         # Aguarda e clica no botão de login
         login_button = WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Entrar')]"))
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "button.button-login"))
         )
         login_button.click()
         
@@ -102,7 +103,7 @@ def login_e_download(driver, email, senha):
         # Verifica se há tela de confirmação
         try:
             confirm_button = WebDriverWait(driver, 5).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Confirmar')]"))
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "button.btn-mv-confirm[data-value='yes']"))
             )
             confirm_button.click()
             print("Tela de confirmação encontrada e confirmada.")
@@ -167,6 +168,13 @@ def login_e_download(driver, email, senha):
         
     except Exception as e:
         print(f"Erro durante o login e download: {str(e)}")
+        # Tenta tirar um screenshot em caso de erro
+        try:
+            screenshot_path = os.path.join("downloads", "erro.png")
+            driver.save_screenshot(screenshot_path)
+            print(f"Screenshot salvo em: {screenshot_path}")
+        except:
+            print("Não foi possível salvar o screenshot do erro")
         return False
 
 if __name__ == "__main__":
