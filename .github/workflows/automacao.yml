@@ -2,203 +2,101 @@ name: Automação Tickets Migrate
 
 on:
   schedule:
-    - cron: '0 8 * * *'  # Executa todos os dias às 8h
-    - cron: '0 14 * * *' # Executa também às 14h
-  workflow_dispatch:  # Permite execução manual
+    - cron: '0 8,14 * * *'  # Executa às 8h e 14h todos os dias
+  workflow_dispatch:
     inputs:
       debug_mode:
         description: 'Executar em modo debug'
         required: false
-        default: false
         type: boolean
+        default: false
 
 env:
   PYTHON_VERSION: '3.11'
-  CHROME_VERSION: 'stable'
+  CHROME_VERSION: '137.0.7151.70'
+  CHROMEDRIVER_VERSION: '137.0.7151.70'
 
 jobs:
   automacao:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     
     steps:
-    - name: Checkout do código
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
     
-    - name: Configurar Python com cache
+    - name: Configurar Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
-        cache-dependency-path: 'requirements.txt'
     
-    - name: Cache para ChromeDriver
-      uses: actions/cache@v4
-      id: cache-chromedriver
-      with:
-        path: /usr/local/bin/chromedriver
-        key: chromedriver-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
-    
-    - name: Instalar Google Chrome
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y wget gnupg2 unzip
-        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-        sudo apt-get update -qq
-        sudo apt-get install -y google-chrome-stable
-        echo "CHROME_VERSION=$(google-chrome --version | awk '{print $3}')" >> $GITHUB_ENV
-    
-    - name: Instalar ChromeDriver compatível
-      if: steps.cache-chromedriver.outputs.cache-hit != 'true'
-      run: |
-        CHROME_DRIVER_VERSION="${{ env.CHROME_VERSION }}"
-        echo "Baixando ChromeDriver versão: $CHROME_DRIVER_VERSION"
-        
-        # Tenta baixar a versão exata, se falhar usa a última estável
-        if ! wget -q "https://storage.googleapis.com/chrome-for-testing-public/$CHROME_DRIVER_VERSION/linux64/chromedriver-linux64.zip"; then
-          echo "Versão exata não encontrada, baixando última versão estável..."
-          LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
-          wget -q "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
-        fi
-        
-        unzip -q chromedriver-linux64.zip
-        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
-        
-        # Verifica se o ChromeDriver funciona
-        chromedriver --version || exit 1
-    
-    - name: Instalar dependências Python
+    - name: Instalar dependências
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        # Instala dependências adicionais para melhor performance
-        pip install wheel setuptools
     
-    - name: Validar variáveis de ambiente
+    - name: Configurar Chrome
       run: |
-        if [[ -z "${{ secrets.MIGRATE_EMAIL }}" || -z "${{ secrets.MIGRATE_SENHA }}" ]]; then
-          echo "❌ ERRO: Variáveis de ambiente obrigatórias não configuradas"
-          echo "Configure MIGRATE_EMAIL e MIGRATE_SENHA nos secrets do repositório"
-          exit 1
-        fi
-        echo "✅ Variáveis de ambiente validadas"
+        wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        sudo dpkg -i google-chrome-stable_current_amd64.deb || true
+        sudo apt-get update
+        sudo apt-get install -y -f
+        google-chrome --version
     
-    - name: Criar arquivo .env com secrets
+    - name: Configurar ChromeDriver
       run: |
-        cat > .env << EOF
-        MIGRATE_EMAIL=${{ secrets.MIGRATE_EMAIL }}
-        MIGRATE_SENHA=${{ secrets.MIGRATE_SENHA }}
-        DEBUG_MODE=${{ github.event.inputs.debug_mode || 'false' }}
-        GITHUB_RUN_ID=${{ github.run_id }}
-        EOF
+        wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${{ env.CHROME_VERSION }}/linux64/chromedriver-linux64.zip"
+        unzip chromedriver-linux64.zip
+        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
+        sudo chmod +x /usr/local/bin/chromedriver
+        chromedriver --version
     
-    - name: Criar estrutura de diretórios
+    - name: Criar diretórios necessários
       run: |
         mkdir -p downloads logs screenshots
-        chmod 755 downloads logs screenshots
     
-    - name: Executar automação com retry
-      id: automacao
+    - name: Executar automação
+      env:
+        EMAIL: ${{ secrets.EMAIL }}
+        SENHA: ${{ secrets.SENHA }}
+        DEBUG_MODE: ${{ inputs.debug_mode }}
       run: |
-        # Configura variáveis para retry
-        MAX_ATTEMPTS=3
-        ATTEMPT=1
-        SUCCESS=false
-        
-        while [ $ATTEMPT -le $MAX_ATTEMPTS ] && [ "$SUCCESS" = false ]; do
-          echo "🚀 Tentativa $ATTEMPT de $MAX_ATTEMPTS"
-          
-          if python automacao_selenium.py; then
-            echo "✅ Automação executada com sucesso na tentativa $ATTEMPT"
-            SUCCESS=true
-          else
-            echo "❌ Falha na tentativa $ATTEMPT"
-            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-              echo "⏳ Aguardando 30 segundos antes da próxima tentativa..."
-              sleep 30
-            fi
-          fi
-          
-          ATTEMPT=$((ATTEMPT + 1))
-        done
-        
-        if [ "$SUCCESS" = false ]; then
-          echo "❌ Todas as tentativas falharam"
-          exit 1
-        fi
-        
-        # Lista arquivos gerados
-        echo "📁 Arquivos gerados:"
-        ls -la downloads/ || true
-        ls -la logs/ || true
+        python automacao_selenium.py
     
-    - name: Validar arquivo Excel gerado
-      id: validacao
+    - name: Verificar arquivo Excel
       run: |
-        EXCEL_FILES=$(find downloads -name "*.xlsx" -type f | wc -l)
-        if [ $EXCEL_FILES -eq 0 ]; then
-          echo "❌ Nenhum arquivo Excel foi gerado"
+        if [ ! -f "downloads/file.xlsx" ]; then
+          echo "❌ Arquivo Excel não foi gerado"
           exit 1
         fi
-        
-        LATEST_EXCEL=$(find downloads -name "*.xlsx" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-)
-        FILE_SIZE=$(stat -c%s "$LATEST_EXCEL")
-        
-        if [ $FILE_SIZE -lt 1024 ]; then
-          echo "❌ Arquivo Excel muito pequeno (${FILE_SIZE} bytes)"
-          exit 1
-        fi
-        
-        echo "✅ Arquivo Excel válido: $(basename "$LATEST_EXCEL") (${FILE_SIZE} bytes)"
-        echo "excel_file=$LATEST_EXCEL" >> $GITHUB_OUTPUT
+        echo "✅ Arquivo Excel gerado com sucesso"
     
-    - name: Fazer upload do arquivo Excel
-      uses: actions/upload-artifact@v4
-      if: steps.validacao.outputs.excel_file
-      with:
-        name: tickets-excel-${{ github.run_id }}
-        path: ${{ steps.validacao.outputs.excel_file }}
-        retention-days: 30
-        compression-level: 6
+    - name: Criar log de tickets ativos
+      run: |
+        echo "📊 Relatório de Tickets Ativos" > logs/tickets_ativos.log
+        echo "Data: $(date)" >> logs/tickets_ativos.log
+        echo "----------------------------------------" >> logs/tickets_ativos.log
+        python -c 'import pandas as pd; import sys; try: df = pd.read_excel("downloads/file.xlsx"); ativos = df[df["Status"] == "Ativo"]; print(f"Total de tickets ativos: {len(ativos)}"); print("\nDetalhes dos tickets ativos:"); [print(f"\nTicket: {ticket.get(\"Número\", \"N/A\")}\nAssunto: {ticket.get(\"Assunto\", \"N/A\")}\nResponsável: {ticket.get(\"Responsável\", \"N/A\")}\nData de criação: {ticket.get(\"Data de criação\", \"N/A\")}\n----------------------------------------") for _, ticket in ativos.iterrows()] except Exception as e: print(f"Erro ao processar arquivo: {str(e)}"); sys.exit(1)' >> logs/tickets_ativos.log
     
-    - name: Fazer upload dos logs
+    - name: Upload de artefatos
       uses: actions/upload-artifact@v4
-      if: always()
       with:
-        name: execution-logs-${{ github.run_id }}
+        name: relatorio-automacao
         path: |
-          logs/
-          *.log
-        retention-days: 7
-        if-no-files-found: ignore
+          downloads/file.xlsx
+          logs/tickets_ativos.log
+          logs/automacao.log
+        if-no-files-found: error
     
-    - name: Fazer upload dos screenshots
-      uses: actions/upload-artifact@v4
+    - name: Upload de screenshots em caso de erro
       if: failure()
+      uses: actions/upload-artifact@v4
       with:
-        name: error-screenshots-${{ github.run_id }}
-        path: |
-          downloads/erro*.png
-          screenshots/
-        retention-days: 14
+        name: screenshots-erro
+        path: screenshots/
         if-no-files-found: ignore
-    
-    - name: Notificar resultado
-      if: always()
-      run: |
-        if [ "${{ job.status }}" = "success" ]; then
-          echo "🎉 Automação concluída com sucesso!"
-          echo "📊 Arquivo Excel gerado e disponível nos artifacts"
-        else
-          echo "💥 Automação falhou!"
-          echo "🔍 Verifique os logs e screenshots nos artifacts para debug"
-        fi
     
     - name: Limpar arquivos temporários
       if: always()
       run: |
-        # Remove arquivos temporários mas mantém os importantes
-        find . -name "*.tmp" -delete 2>/dev/null || true
-        find . -name "core.*" -delete 2>/dev/null || true
+        rm -rf downloads/*.xlsx
+        rm -rf screenshots/*
