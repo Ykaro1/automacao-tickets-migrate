@@ -61,6 +61,11 @@ def iniciar_navegador():
         chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--headless")  # Executa em modo headless
+        chrome_options.add_argument("--disable-gpu")  # Desabilita GPU
+        chrome_options.add_argument("--window-size=1920,1080")  # Define tamanho da janela
+        chrome_options.add_argument("--disable-extensions")  # Desabilita extensões
+        chrome_options.add_argument("--disable-software-rasterizer")  # Desabilita rasterizador de software
         
         # Configuração do diretório de downloads
         download_dir = os.path.abspath(os.path.join(os.getcwd(), "downloads"))
@@ -81,6 +86,12 @@ def iniciar_navegador():
             "safebrowsing.enabled": True
         }
         chrome_options.add_experimental_option("prefs", prefs)
+        
+        # Adiciona um diretório temporário único para dados do usuário
+        temp_user_data_dir = os.path.join(os.getcwd(), "chrome_temp_data")
+        if not os.path.exists(temp_user_data_dir):
+            os.makedirs(temp_user_data_dir)
+        chrome_options.add_argument(f"--user-data-dir={temp_user_data_dir}")
         
         print("Iniciando o navegador Chrome...")
         driver = webdriver.Chrome(options=chrome_options)
