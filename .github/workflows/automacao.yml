@@ -3,7 +3,13 @@ name: Automação de Tickets
 on:
   schedule:
     - cron: '0 */4 * * *'  # Roda a cada 4 horas
-  workflow_dispatch:  # Permite execução manual
+  workflow_dispatch:
+    inputs:
+      debug_mode:
+        description: 'Executar em modo debug'
+        required: false
+        type: boolean
+        default: false
 
 env:
   PYTHON_VERSION: '3.11'
@@ -59,6 +65,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
           AUTORES_INTERNOS: ${{ secrets.AUTORES_INTERNOS }}
+          DEBUG_MODE: ${{ inputs.debug_mode }}
         run: |
           python automacao_selenium.py
           python analisador_tickets.py
