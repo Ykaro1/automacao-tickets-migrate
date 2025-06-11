@@ -86,73 +86,31 @@ class Config:
 class TicketAnalyzer:
     """Classe para análise de dados dos tickets."""
     
-    def __init__(self, logger: logging.Logger):
-        self.logger = logger
+    def __init__(self, file_path: Path):
+        self.file_path = file_path
     
-    def analyze_excel(self, file_path: Path) -> Dict[str, Any]:
-        """Analisa o arquivo Excel e retorna estatísticas dos tickets."""
+    def analyze_tickets(self) -> bool:
+        """Analisa os tickets no arquivo CSV."""
         try:
-            self.logger.info(f"Analisando arquivo: {file_path}")
+            # Lê o arquivo CSV com encoding UTF-8
+            df = pd.read_csv(self.file_path, encoding='utf-8')
             
-            # Lê o arquivo Excel com tratamento de erros
-            df = pd.read_excel(file_path, engine='openpyxl')
+            total_tickets = len(df)
+            active_tickets = len(df[df['Status'] == 'Ativo'])
             
-            if df.empty:
-                raise ValueError("Arquivo Excel está vazio")
+            status_counts = df['Status'].value_counts()
             
-            self.logger.info(f"Arquivo carregado com {len(df)} registros")
-            self.logger.info(f"Colunas encontradas: {df.columns.tolist()}")
+            logging.info(f"Total de tickets: {total_tickets}")
+            logging.info(f"Tickets ativos: {active_tickets}")
+            logging.info("\nDistribuição por status:")
+            for status, count in status_counts.items():
+                logging.info(f"{status}: {count}")
             
-            # Verifica se a coluna 'Status' existe
-            if 'Status' not in df.columns:
-                # Tenta encontrar colunas similares
-                possible_status_cols = [col for col in df.columns if 'status' in col.lower()]
-                if possible_status_cols:
-                    status_col = possible_status_cols[0]
-                    self.logger.warning(f"Coluna 'Status' não encontrada, usando '{status_col}'")
-                else:
-                    raise ValueError(f"Coluna de status não encontrada. Colunas disponíveis: {df.columns.tolist()}")
-            else:
-                status_col = 'Status'
-            
-            # Normaliza os valores de status
-            df[status_col] = df[status_col].astype(str).str.strip()
-            
-            # Define quais status são considerados "fechados"
-            closed_statuses = {'Fechado', 'Resolvido', 'Cancelado', 'Concluído'}
-            
-            # Filtra tickets ativos (não fechados)
-            tickets_ativos = df[~df[status_col].isin(closed_statuses)]
-            
-            # Estatísticas
-            stats = {
-                'total_tickets': len(df),
-                'tickets_ativos': len(tickets_ativos),
-                'tickets_fechados': len(df) - len(tickets_ativos),
-                'status_breakdown': df[status_col].value_counts().to_dict(),
-                'arquivo_analisado': str(file_path),
-                'timestamp_analise': datetime.now().isoformat()
-            }
-            
-            self.logger.info(f"Total de tickets: {stats['total_tickets']}")
-            self.logger.info(f"Tickets ativos: {stats['tickets_ativos']}")
-            self.logger.info(f"Tickets fechados: {stats['tickets_fechados']}")
-            
-            # Log detalhado dos status
-            for status, count in stats['status_breakdown'].items():
-                self.logger.info(f"Status '{status}': {count} tickets")
-            
-            # Mostra amostra dos tickets ativos se houver
-            if len(tickets_ativos) > 0:
-                sample_cols = ['Número', 'Status', 'Título'] if all(col in df.columns for col in ['Número', 'Status', 'Título']) else df.columns[:3]
-                sample = tickets_ativos[sample_cols].head()
-                self.logger.info(f"Amostra de tickets ativos:\n{sample.to_string()}")
-            
-            return stats
+            return True
             
         except Exception as e:
-            self.logger.error(f"Erro ao analisar arquivo Excel: {str(e)}")
-            raise
+            logging.error(f"Erro ao analisar tickets: {str(e)}")
+            return False
 
 class SeleniumAutomation:
     """Classe principal para automação com Selenium."""
@@ -161,7 +119,8 @@ class SeleniumAutomation:
         self.config = config
         self.logger = logger
         self.driver: Optional[webdriver.Chrome] = None
-        self.analyzer = TicketAnalyzer(logger)
+        self.wait = None
+        self.analyzer = TicketAnalyzer(self.config.download_dir / "file.csv")
     
     def setup_chrome_options(self) -> Options:
         """Configura as opções do Chrome."""
@@ -221,6 +180,8 @@ class SeleniumAutomation:
             # Remove propriedades que indicam automação
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
+            self.wait = WebDriverWait(self.driver, self.config.element_wait_timeout)
+            
             self.logger.info("Driver Chrome inicializado com sucesso")
             return True
             
@@ -275,7 +236,7 @@ class SeleniumAutomation:
             self.logger.info(f"Acessando: {self.config.login_url}")
             
             # Aguarda a página carregar
-            WebDriverWait(self.driver, self.config.element_wait_timeout).until(
+            self.wait.until(
                 EC.presence_of_element_located((By.TAG_NAME, "body"))
             )
             
@@ -283,7 +244,7 @@ class SeleniumAutomation:
             
             # Preenche email
             self.logger.info("Preenchendo campo de e-mail...")
-            email_input = WebDriverWait(self.driver, self.config.element_wait_timeout).until(
+            email_input = self.wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='text'], input[type='email']"))
             )
             email_input.clear()
@@ -293,7 +254,7 @@ class SeleniumAutomation:
             
             # Preenche senha
             self.logger.info("Preenchendo campo de senha...")
-            password_input = WebDriverWait(self.driver, self.config.element_wait_timeout).until(
+            password_input = self.wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='password']"))
             )
             password_input.clear()
@@ -303,7 +264,7 @@ class SeleniumAutomation:
             
             # Clica no botão de login
             self.logger.info("Procurando botão de login...")
-            login_button = WebDriverWait(self.driver, self.config.element_wait_timeout).until(
+            login_button = self.wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button.button-login, button[type='submit'], input[type='submit']"))
             )
             
@@ -316,7 +277,7 @@ class SeleniumAutomation:
             
             # Verifica se há modal de confirmação
             try:
-                confirm_button = WebDriverWait(self.driver, 5).until(
+                confirm_button = self.wait.until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, "button.btn-mv-confirm[data-value='yes']"))
                 )
                 self.safe_click(confirm_button, "botão de confirmação")
@@ -360,11 +321,11 @@ class SeleniumAutomation:
             for selector in opcoes_selectors:
                 try:
                     if selector.startswith("//"):
-                        opcoes_button = WebDriverWait(self.driver, 5).until(
+                        opcoes_button = self.wait.until(
                             EC.element_to_be_clickable((By.XPATH, selector))
                         )
                     else:
-                        opcoes_button = WebDriverWait(self.driver, 5).until(
+                        opcoes_button = self.wait.until(
                             EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
                         )
                     break
@@ -393,11 +354,11 @@ class SeleniumAutomation:
             for selector in export_selectors:
                 try:
                     if selector.startswith("//"):
-                        export_link = WebDriverWait(self.driver, 5).until(
+                        export_link = self.wait.until(
                             EC.element_to_be_clickable((By.XPATH, selector))
                         )
                     else:
-                        export_link = WebDriverWait(self.driver, 5).until(
+                        export_link = self.wait.until(
                             EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
                         )
                     break
@@ -415,7 +376,7 @@ class SeleniumAutomation:
             # Configura opções de exportação se disponível
             try:
                 self.logger.info("Configurando opções de exportação...")
-                select_element = WebDriverWait(self.driver, 10).until(
+                select_element = self.wait.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "select.col-xs-12.input-mv-new.md-confirm-options, select[name*='export'], select.export-options"))
                 )
                 
@@ -440,11 +401,11 @@ class SeleniumAutomation:
                 for selector in ok_selectors:
                     try:
                         if selector.startswith("//"):
-                            ok_button = WebDriverWait(self.driver, 5).until(
+                            ok_button = self.wait.until(
                                 EC.element_to_be_clickable((By.XPATH, selector))
                             )
                         else:
-                            ok_button = WebDriverWait(self.driver, 5).until(
+                            ok_button = self.wait.until(
                                 EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
                             )
                         break
@@ -487,8 +448,8 @@ class SeleniumAutomation:
                             self.logger.info(f"Download concluído: {latest_file.name} ({latest_file.stat().st_size} bytes)")
                             
                             # Analisa o arquivo
-                            stats = self.analyzer.analyze_excel(latest_file)
-                            self.logger.info(f"Análise concluída: {stats['tickets_ativos']} tickets ativos de {stats['total_tickets']} total")
+                            if not self.analyzer.analyze_tickets():
+                                raise Exception("Falha na análise dos tickets")
                             
                             return True
                 
