@@ -102,23 +102,44 @@ class TicketAnalyzer:
             for encoding in encodings:
                 try:
                     logging.info(f"Tentando ler arquivo com encoding: {encoding}")
-                    df = pd.read_csv(self.file_path, encoding=encoding)
                     
-                    # Se chegou aqui, a leitura foi bem sucedida
-                    logging.info(f"Arquivo lido com sucesso usando encoding: {encoding}")
+                    # Tenta diferentes configurações de leitura
+                    read_options = [
+                        {'sep': ',', 'quoting': 1},  # csv.QUOTE_ALL
+                        {'sep': ';', 'quoting': 1},  # csv.QUOTE_ALL
+                        {'sep': ',', 'quoting': 0},  # csv.QUOTE_MINIMAL
+                        {'sep': ';', 'quoting': 0},  # csv.QUOTE_MINIMAL
+                    ]
                     
-                    total_tickets = len(df)
-                    active_tickets = len(df[df['Status'] == 'Ativo'])
-                    
-                    status_counts = df['Status'].value_counts()
-                    
-                    logging.info(f"Total de tickets: {total_tickets}")
-                    logging.info(f"Tickets ativos: {active_tickets}")
-                    logging.info("\nDistribuição por status:")
-                    for status, count in status_counts.items():
-                        logging.info(f"{status}: {count}")
-                    
-                    return True
+                    for options in read_options:
+                        try:
+                            df = pd.read_csv(
+                                self.file_path,
+                                encoding=encoding,
+                                sep=options['sep'],
+                                quoting=options['quoting'],
+                                on_bad_lines='warn'  # Ignora linhas problemáticas
+                            )
+                            
+                            # Se chegou aqui, a leitura foi bem sucedida
+                            logging.info(f"Arquivo lido com sucesso usando encoding: {encoding} e opções: {options}")
+                            
+                            total_tickets = len(df)
+                            active_tickets = len(df[df['Status'] == 'Ativo'])
+                            
+                            status_counts = df['Status'].value_counts()
+                            
+                            logging.info(f"Total de tickets: {total_tickets}")
+                            logging.info(f"Tickets ativos: {active_tickets}")
+                            logging.info("\nDistribuição por status:")
+                            for status, count in status_counts.items():
+                                logging.info(f"{status}: {count}")
+                            
+                            return True
+                            
+                        except Exception as e:
+                            logging.warning(f"Falha ao ler com opções {options}: {str(e)}")
+                            continue
                     
                 except UnicodeDecodeError:
                     logging.warning(f"Falha ao ler com encoding {encoding}, tentando próximo...")
@@ -242,7 +263,7 @@ class SeleniumAutomation:
                 self.driver.execute_script("arguments[0].click();", element)
                 self.logger.info(f"Clique via JavaScript em {description}")
                 return True
-                
+        
         except Exception as e:
             self.logger.error(f"Erro ao clicar em {description}: {str(e)}")
             return False
