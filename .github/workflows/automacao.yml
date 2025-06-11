@@ -31,7 +31,7 @@ jobs:
       run: |
         CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d'.' -f1)
         echo "Chrome version: $CHROME_VERSION"
-        CHROMEDRIVER_VERSION="120.0.6099.109"
+        CHROMEDRIVER_VERSION="137.0.7151.70"
         echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
         wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
         unzip chromedriver-linux64.zip
