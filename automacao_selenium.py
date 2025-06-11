@@ -1,3 +1,7 @@
+"""
+Script de automação para análise de tickets usando Selenium.
+"""
+
 import os
 import time
 import logging
@@ -6,8 +10,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 from dotenv import load_dotenv
-
-# Bibliotecas do Selenium
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -21,6 +23,7 @@ from selenium.common.exceptions import (
     WebDriverException,
     ElementClickInterceptedException
 )
+from config import config
 
 # Carrega as variáveis de ambiente
 load_dotenv()
@@ -28,8 +31,8 @@ load_dotenv()
 # Configuração de logging
 def setup_logging() -> logging.Logger:
     """Configura o sistema de logging."""
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
+    log_dir = config.paths.log_dir
+    log_dir.mkdir(parents=True, exist_ok=True)
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_dir / f"automacao_{timestamp}.log"
@@ -84,29 +87,47 @@ class Config:
         return True
 
 class TicketAnalyzer:
-    """Classe para análise de dados dos tickets."""
+    """Classe para análise de tickets."""
     
-    def __init__(self, file_path: Path):
+    def __init__(self, file_path):
         self.file_path = file_path
     
-    def analyze_tickets(self) -> bool:
+    def analyze_tickets(self):
         """Analisa os tickets no arquivo CSV."""
         try:
-            # Lê o arquivo CSV com encoding UTF-8
-            df = pd.read_csv(self.file_path, encoding='utf-8')
+            # Lista de codificações para tentar
+            encodings = ['latin1', 'iso-8859-1', 'cp1252', 'utf-8']
             
-            total_tickets = len(df)
-            active_tickets = len(df[df['Status'] == 'Ativo'])
+            # Tenta cada codificação
+            for encoding in encodings:
+                try:
+                    logging.info(f"Tentando ler arquivo com encoding: {encoding}")
+                    df = pd.read_csv(self.file_path, encoding=encoding)
+                    
+                    # Se chegou aqui, a leitura foi bem sucedida
+                    logging.info(f"Arquivo lido com sucesso usando encoding: {encoding}")
+                    
+                    total_tickets = len(df)
+                    active_tickets = len(df[df['Status'] == 'Ativo'])
+                    
+                    status_counts = df['Status'].value_counts()
+                    
+                    logging.info(f"Total de tickets: {total_tickets}")
+                    logging.info(f"Tickets ativos: {active_tickets}")
+                    logging.info("\nDistribuição por status:")
+                    for status, count in status_counts.items():
+                        logging.info(f"{status}: {count}")
+                    
+                    return True
+                    
+                except UnicodeDecodeError:
+                    logging.warning(f"Falha ao ler com encoding {encoding}, tentando próximo...")
+                    continue
+                except Exception as e:
+                    logging.error(f"Erro ao processar arquivo com encoding {encoding}: {str(e)}")
+                    continue
             
-            status_counts = df['Status'].value_counts()
-            
-            logging.info(f"Total de tickets: {total_tickets}")
-            logging.info(f"Tickets ativos: {active_tickets}")
-            logging.info("\nDistribuição por status:")
-            for status, count in status_counts.items():
-                logging.info(f"{status}: {count}")
-            
-            return True
+            raise Exception("Não foi possível ler o arquivo com nenhuma codificação suportada")
             
         except Exception as e:
             logging.error(f"Erro ao analisar tickets: {str(e)}")
