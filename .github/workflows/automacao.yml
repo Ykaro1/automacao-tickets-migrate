@@ -1,8 +1,10 @@
 name: Automação de Tickets
 
 on:
-  schedule:
   workflow_dispatch:  # Permite execução manual
+
+permissions:
+  contents: write  # Permissão para fazer push
 
 jobs:
   automacao:
