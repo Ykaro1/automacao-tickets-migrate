@@ -69,26 +69,3 @@ jobs:
         run: |
           python automacao_selenium.py
           python analisador_tickets.py
-      
-    - name: Verificar arquivo CSV
-      run: |
-        if [ ! -f "downloads/file.csv" ]; then
-          echo "❌ Arquivo CSV não foi gerado"
-          exit 1
-        fi
-        echo "✅ Arquivo CSV gerado com sucesso"
-    
-    - name: Upload de artefatos
-      uses: actions/upload-artifact@v4
-      with:
-        name: relatorio-automacao
-        path: |
-          downloads/file.csv
-          logs/automacao.log
-        if-no-files-found: error
-    
-    - name: Limpar arquivos temporários
-      if: always()
-      run: |
-        rm -rf downloads/*.csv
-        rm -rf screenshots/*
