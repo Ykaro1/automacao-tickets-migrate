@@ -1,84 +1,176 @@
 import os
 import time
+import logging
 import pandas as pd
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Tuple, Dict, Any
 from dotenv import load_dotenv
 
-# Carrega as variáveis de ambiente do arquivo .env
-load_dotenv()
-
-# --- Bibliotecas do Selenium ---
+# Bibliotecas do Selenium
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import (
+    TimeoutException, 
+    NoSuchElementException, 
+    WebDriverException,
+    ElementClickInterceptedException
+)
 
-# --- CONFIGURAÇÕES E CREDENCIAIS ---
-MIGRATE_EMAIL = os.getenv("MIGRATE_EMAIL")
-MIGRATE_SENHA = os.getenv("MIGRATE_SENHA")
+# Carrega as variáveis de ambiente
+load_dotenv()
 
-def verificar_variaveis_ambiente():
-    """Verifica se todas as variáveis de ambiente necessárias estão configuradas."""
-    variaveis_necessarias = {
-        "MIGRATE_EMAIL": MIGRATE_EMAIL,
-        "MIGRATE_SENHA": MIGRATE_SENHA
-    }
-    variaveis_faltantes = [var for var, valor in variaveis_necessarias.items() if not valor]
-    if variaveis_faltantes:
-        print("ERRO: As seguintes variáveis de ambiente não foram configuradas no arquivo .env:")
-        for var in variaveis_faltantes:
-            print(f"- {var}")
-        return False
-    return True
+# Configuração de logging
+def setup_logging() -> logging.Logger:
+    """Configura o sistema de logging."""
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"automacao_{timestamp}.log"
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler()
+        ]
+    )
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Log iniciado: {log_file}")
+    return logger
 
-def analisar_excel(arquivo_excel):
-    """Analisa o arquivo Excel e conta os tickets ativos."""
-    try:
-        print(f"\nAnalisando arquivo: {arquivo_excel}")
-        # Lê o arquivo Excel
-        df = pd.read_excel(arquivo_excel)
+# Configurações
+class Config:
+    """Classe para centralizar configurações."""
+    
+    def __init__(self):
+        self.migrate_email = os.getenv("MIGRATE_EMAIL")
+        self.migrate_senha = os.getenv("MIGRATE_SENHA")
+        self.debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
+        self.github_run_id = os.getenv("GITHUB_RUN_ID", "local")
         
-        # Verifica se a coluna 'Status' existe
-        if 'Status' not in df.columns:
-            print("ERRO: Coluna 'Status' não encontrada no arquivo Excel")
-            print(f"Colunas encontradas: {df.columns.tolist()}")
-            return
+        # Timeouts
+        self.page_load_timeout = 30
+        self.element_wait_timeout = 20
+        self.download_wait_timeout = 60
         
-        # Filtra os tickets que não estão fechados ou resolvidos
-        tickets_ativos = df[~df['Status'].isin(['Fechado', 'Resolvido'])]
+        # Diretórios
+        self.download_dir = Path("downloads").resolve()
+        self.screenshot_dir = Path("screenshots").resolve()
         
-        # Conta quantos tickets ativos existem
-        total_ativos = len(tickets_ativos)
+        # URLs
+        self.login_url = "https://atendimento.migrate.com.br/Ticket"
+    
+    def validate(self) -> bool:
+        """Valida se todas as configurações necessárias estão presentes."""
+        required_vars = {
+            "MIGRATE_EMAIL": self.migrate_email,
+            "MIGRATE_SENHA": self.migrate_senha
+        }
         
-        print(f"\nTotal de tickets ativos: {total_ativos}")
+        missing_vars = [var for var, value in required_vars.items() if not value]
         
-        # Mostra os status únicos dos tickets ativos
-        print("\nStatus únicos dos tickets ativos:")
-        for status in tickets_ativos['Status'].unique():
-            count = len(tickets_ativos[tickets_ativos['Status'] == status])
-            print(f"- {status}: {count} tickets")
+        if missing_vars:
+            raise ValueError(f"Variáveis de ambiente obrigatórias não configuradas: {missing_vars}")
         
-        # Mostra os primeiros 5 tickets ativos
-        if total_ativos > 0:
-            print("\nPrimeiros 5 tickets ativos:")
-            print(tickets_ativos[['Número', 'Status', 'Título']].head().to_string())
-        
-    except Exception as e:
-        print(f"ERRO ao analisar o arquivo Excel: {str(e)}")
+        return True
 
-def iniciar_navegador():
-    """Inicia o navegador Chrome."""
-    try:
-        # Configura o diretório de downloads
-        download_dir = os.path.abspath("downloads")
-        if not os.path.exists(download_dir):
-            os.makedirs(download_dir)
-        
-        # Configura as opções do Chrome
+class TicketAnalyzer:
+    """Classe para análise de dados dos tickets."""
+    
+    def __init__(self, logger: logging.Logger):
+        self.logger = logger
+    
+    def analyze_excel(self, file_path: Path) -> Dict[str, Any]:
+        """Analisa o arquivo Excel e retorna estatísticas dos tickets."""
+        try:
+            self.logger.info(f"Analisando arquivo: {file_path}")
+            
+            # Lê o arquivo Excel com tratamento de erros
+            df = pd.read_excel(file_path, engine='openpyxl')
+            
+            if df.empty:
+                raise ValueError("Arquivo Excel está vazio")
+            
+            self.logger.info(f"Arquivo carregado com {len(df)} registros")
+            self.logger.info(f"Colunas encontradas: {df.columns.tolist()}")
+            
+            # Verifica se a coluna 'Status' existe
+            if 'Status' not in df.columns:
+                # Tenta encontrar colunas similares
+                possible_status_cols = [col for col in df.columns if 'status' in col.lower()]
+                if possible_status_cols:
+                    status_col = possible_status_cols[0]
+                    self.logger.warning(f"Coluna 'Status' não encontrada, usando '{status_col}'")
+                else:
+                    raise ValueError(f"Coluna de status não encontrada. Colunas disponíveis: {df.columns.tolist()}")
+            else:
+                status_col = 'Status'
+            
+            # Normaliza os valores de status
+            df[status_col] = df[status_col].astype(str).str.strip()
+            
+            # Define quais status são considerados "fechados"
+            closed_statuses = {'Fechado', 'Resolvido', 'Cancelado', 'Concluído'}
+            
+            # Filtra tickets ativos (não fechados)
+            tickets_ativos = df[~df[status_col].isin(closed_statuses)]
+            
+            # Estatísticas
+            stats = {
+                'total_tickets': len(df),
+                'tickets_ativos': len(tickets_ativos),
+                'tickets_fechados': len(df) - len(tickets_ativos),
+                'status_breakdown': df[status_col].value_counts().to_dict(),
+                'arquivo_analisado': str(file_path),
+                'timestamp_analise': datetime.now().isoformat()
+            }
+            
+            self.logger.info(f"Total de tickets: {stats['total_tickets']}")
+            self.logger.info(f"Tickets ativos: {stats['tickets_ativos']}")
+            self.logger.info(f"Tickets fechados: {stats['tickets_fechados']}")
+            
+            # Log detalhado dos status
+            for status, count in stats['status_breakdown'].items():
+                self.logger.info(f"Status '{status}': {count} tickets")
+            
+            # Mostra amostra dos tickets ativos se houver
+            if len(tickets_ativos) > 0:
+                sample_cols = ['Número', 'Status', 'Título'] if all(col in df.columns for col in ['Número', 'Status', 'Título']) else df.columns[:3]
+                sample = tickets_ativos[sample_cols].head()
+                self.logger.info(f"Amostra de tickets ativos:\n{sample.to_string()}")
+            
+            return stats
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao analisar arquivo Excel: {str(e)}")
+            raise
+
+class SeleniumAutomation:
+    """Classe principal para automação com Selenium."""
+    
+    def __init__(self, config: Config, logger: logging.Logger):
+        self.config = config
+        self.logger = logger
+        self.driver: Optional[webdriver.Chrome] = None
+        self.analyzer = TicketAnalyzer(logger)
+    
+    def setup_chrome_options(self) -> Options:
+        """Configura as opções do Chrome."""
         chrome_options = Options()
-        chrome_options.add_argument("--headless=new")  # Modo headless
+        
+        # Configurações básicas
+        if not self.config.debug_mode:
+            chrome_options.add_argument("--headless=new")
+        
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
@@ -87,178 +179,385 @@ def iniciar_navegador():
         chrome_options.add_argument("--disable-popup-blocking")
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         chrome_options.add_argument("--disable-infobars")
+        chrome_options.add_argument("--disable-web-security")
+        chrome_options.add_argument("--allow-running-insecure-content")
+        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+        
+        # Remove indicadores de automação
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option("useAutomationExtension", False)
         
-        # Configura o diretório de downloads
+        # Configurações de download
         prefs = {
-            "download.default_directory": download_dir,
+            "download.default_directory": str(self.config.download_dir),
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
             "safebrowsing.enabled": True,
-            "profile.default_content_settings.popups": 0
+            "profile.default_content_settings.popups": 0,
+            "profile.default_content_setting_values.notifications": 2,
+            "profile.managed_default_content_settings.images": 2  # Não carrega imagens para economizar banda
         }
         chrome_options.add_experimental_option("prefs", prefs)
         
-        # Inicia o navegador
-        print("Iniciando o navegador Chrome...")
-        driver = webdriver.Chrome(options=chrome_options)
-        driver.set_page_load_timeout(30)
-        
-        return driver, download_dir
-        
-    except Exception as e:
-        print(f"ERRO ao iniciar o navegador: {str(e)}")
-        return None, None
-
-def login_e_download(driver, download_dir):
-    """Realiza o login e faz o download do arquivo."""
-    try:
-        # Acessa a página de login
-        print("Inserindo credenciais...")
-        driver.get("https://atendimento.migrate.com.br/Ticket")
-        time.sleep(10)  # Aumentado para 10 segundos
-        
-        # Aguarda e preenche o email
-        print("Procurando campo de e-mail...")
-        email_input = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text']"))
-        )
-        email_input.clear()  # Limpa o campo antes de inserir
-        time.sleep(1)  # Pequena pausa após limpar
-        email_input.send_keys(MIGRATE_EMAIL)
-        print("E-mail inserido com sucesso")
-        
-        # Aguarda e preenche a senha
-        print("Procurando campo de senha...")
-        password_input = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
-        )
-        password_input.clear()  # Limpa o campo antes de inserir
-        time.sleep(1)  # Pequena pausa após limpar
-        password_input.send_keys(MIGRATE_SENHA)
-        print("Senha inserida com sucesso")
-        
-        # Clica no botão de login
-        print("Procurando botão de login...")
-        login_button = WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "button.button-login"))
-        )
-        login_button.click()
-        print("Botão de login clicado")
-        
-        # Aguarda o carregamento da página
-        print("Login realizado. Aguardando carregamento da página...")
-        time.sleep(10)  # Aumentado para 10 segundos
-        
-        # Verifica se há tela de confirmação
+        return chrome_options
+    
+    def initialize_driver(self) -> bool:
+        """Inicializa o driver do Chrome."""
         try:
-            confirm_button = WebDriverWait(driver, 5).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "button.btn-mv-confirm[data-value='yes']"))
-            )
-            confirm_button.click()
-            print("Tela de confirmação encontrada e confirmada.")
-        except:
-            print("Nenhuma tela de confirmação encontrada.")
-        
-        # Aguarda mais um pouco para garantir que a página carregou completamente
-        time.sleep(5)
-        
-        # Procura e clica no botão OPÇÕES
-        print("Procurando botão OPÇÕES...")
-        opcoes_button = WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.XPATH, "//span[contains(@class, 'button-text') and text()='OPÇÕES']"))
-        )
-        print("Botão OPÇÕES encontrado, clicando...")
-        opcoes_button.click()
-        
-        # Aguarda um pouco após clicar em OPÇÕES
-        time.sleep(2)
-        
-        # Procura e clica no link de exportar para Excel
-        print("Procurando link de exportar para Excel...")
-        exportar_link = WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "a.btnExport.btnExportToExcel"))
-        )
-        print("Link de exportar encontrado, clicando...")
-        exportar_link.click()
-        
-        # Aguarda o modal de opções aparecer
-        time.sleep(2)
-        
-        # Seleciona a opção "Todas as ações na mesma coluna"
-        print("Selecionando opção de exportação...")
-        select_element = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "select.col-xs-12.input-mv-new.md-confirm-options"))
-        )
-        select = Select(select_element)
-        select.select_by_value("3")  # Valor 3 corresponde a "Todas as ações na mesma coluna"
-        print("Opção selecionada com sucesso")
-        
-        # Clica no botão OK
-        print("Procurando botão OK...")
-        ok_button = WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "button.btn-mv.btn-mv-confirm.md-confirm-action.trigger-service-nps[data-value='ok']"))
-        )
-        ok_button.click()
-        print("Botão OK clicado")
-        
-        # Aguarda o download
-        print("Aguardando download...")
-        time.sleep(30)  # Aumentado para 30 segundos
-        
-        # Verifica se o arquivo foi baixado
-        print("Verificando arquivos no diretório de downloads...")
-        arquivos = os.listdir(download_dir)
-        print(f"Arquivos encontrados: {arquivos}")
-        
-        # Tenta encontrar o arquivo Excel mais recente
-        arquivos_excel = [f for f in arquivos if f.endswith('.xlsx')]
-        if arquivos_excel:
-            # Pega o arquivo mais recente
-            arquivo_excel = max(arquivos_excel, key=lambda x: os.path.getctime(os.path.join(download_dir, x)))
-            print(f"Arquivo baixado com sucesso: {arquivo_excel}")
+            self.logger.info("Inicializando driver Chrome...")
             
-            # Analisa o arquivo Excel
-            caminho_completo = os.path.join(download_dir, arquivo_excel)
-            analisar_excel(caminho_completo)
+            # Cria diretórios necessários
+            self.config.download_dir.mkdir(parents=True, exist_ok=True)
+            self.config.screenshot_dir.mkdir(parents=True, exist_ok=True)
             
+            chrome_options = self.setup_chrome_options()
+            
+            # Configura o service (opcional, usa o ChromeDriver do PATH)
+            service = Service() if not os.path.exists("/usr/local/bin/chromedriver") else Service("/usr/local/bin/chromedriver")
+            
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            self.driver.set_page_load_timeout(self.config.page_load_timeout)
+            
+            # Remove propriedades que indicam automação
+            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            
+            self.logger.info("Driver Chrome inicializado com sucesso")
             return True
-        else:
-            print("Nenhum arquivo Excel encontrado no diretório de downloads")
-            # Tira um screenshot para debug
-            screenshot_path = os.path.join(download_dir, "erro_download.png")
-            driver.save_screenshot(screenshot_path)
-            print(f"Screenshot salvo em: {screenshot_path}")
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao inicializar driver: {str(e)}")
+            return False
+    
+    def take_screenshot(self, name: str = "screenshot") -> Path:
+        """Tira screenshot para debug."""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_path = self.config.screenshot_dir / f"{name}_{timestamp}.png"
+            
+            if self.driver:
+                self.driver.save_screenshot(str(screenshot_path))
+                self.logger.info(f"Screenshot salvo: {screenshot_path}")
+            
+            return screenshot_path
+        except Exception as e:
+            self.logger.error(f"Erro ao tirar screenshot: {str(e)}")
+            return Path()
+    
+    def safe_click(self, element, description: str = "elemento") -> bool:
+        """Clica em um elemento de forma segura."""
+        try:
+            # Scroll para o elemento
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", element)
+            time.sleep(0.5)
+            
+            # Tenta clicar normalmente
+            try:
+                element.click()
+                self.logger.info(f"Clique realizado em {description}")
+                return True
+            except ElementClickInterceptedException:
+                # Se o clique normal falhar, usa JavaScript
+                self.driver.execute_script("arguments[0].click();", element)
+                self.logger.info(f"Clique via JavaScript em {description}")
+                return True
+                
+        except Exception as e:
+            self.logger.error(f"Erro ao clicar em {description}: {str(e)}")
+            return False
+    
+    def login(self) -> bool:
+        """Realiza o login no sistema."""
+        try:
+            self.logger.info("Iniciando processo de login...")
+            
+            # Acessa a página de login
+            self.driver.get(self.config.login_url)
+            self.logger.info(f"Acessando: {self.config.login_url}")
+            
+            # Aguarda a página carregar
+            WebDriverWait(self.driver, self.config.element_wait_timeout).until(
+                EC.presence_of_element_located((By.TAG_NAME, "body"))
+            )
+            
+            time.sleep(3)  # Aguarda estabilização
+            
+            # Preenche email
+            self.logger.info("Preenchendo campo de e-mail...")
+            email_input = WebDriverWait(self.driver, self.config.element_wait_timeout).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='text'], input[type='email']"))
+            )
+            email_input.clear()
+            time.sleep(0.5)
+            email_input.send_keys(self.config.migrate_email)
+            self.logger.info("E-mail preenchido")
+            
+            # Preenche senha
+            self.logger.info("Preenchendo campo de senha...")
+            password_input = WebDriverWait(self.driver, self.config.element_wait_timeout).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='password']"))
+            )
+            password_input.clear()
+            time.sleep(0.5)
+            password_input.send_keys(self.config.migrate_senha)
+            self.logger.info("Senha preenchida")
+            
+            # Clica no botão de login
+            self.logger.info("Procurando botão de login...")
+            login_button = WebDriverWait(self.driver, self.config.element_wait_timeout).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "button.button-login, button[type='submit'], input[type='submit']"))
+            )
+            
+            if not self.safe_click(login_button, "botão de login"):
+                return False
+            
+            # Aguarda redirecionamento
+            self.logger.info("Aguardando redirecionamento pós-login...")
+            time.sleep(5)
+            
+            # Verifica se há modal de confirmação
+            try:
+                confirm_button = WebDriverWait(self.driver, 5).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "button.btn-mv-confirm[data-value='yes']"))
+                )
+                self.safe_click(confirm_button, "botão de confirmação")
+                self.logger.info("Modal de confirmação processado")
+            except TimeoutException:
+                self.logger.info("Nenhum modal de confirmação encontrado")
+            
+            # Verifica se o login foi bem-sucedido
+            time.sleep(3)
+            current_url = self.driver.current_url
+            
+            if "login" in current_url.lower() or "erro" in current_url.lower():
+                self.logger.error("Login pode ter falhado - ainda na página de login")
+                self.take_screenshot("login_failed")
+                return False
+            
+            self.logger.info("Login realizado com sucesso")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Erro durante login: {str(e)}")
+            self.take_screenshot("login_error")
+            return False
+    
+    def export_to_excel(self) -> bool:
+        """Exporta os dados para Excel."""
+        try:
+            self.logger.info("Iniciando processo de exportação...")
+            
+            # Procura e clica no botão OPÇÕES
+            self.logger.info("Procurando botão OPÇÕES...")
+            opcoes_selectors = [
+                "//span[contains(@class, 'button-text') and text()='OPÇÕES']",
+                "//button[contains(text(), 'OPÇÕES')]",
+                "//a[contains(text(), 'OPÇÕES')]",
+                ".btn-options",
+                "#options-button"
+            ]
+            
+            opcoes_button = None
+            for selector in opcoes_selectors:
+                try:
+                    if selector.startswith("//"):
+                        opcoes_button = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                    else:
+                        opcoes_button = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+                        )
+                    break
+                except TimeoutException:
+                    continue
+            
+            if not opcoes_button:
+                raise Exception("Botão OPÇÕES não encontrado")
+            
+            if not self.safe_click(opcoes_button, "botão OPÇÕES"):
+                return False
+            
+            time.sleep(2)
+            
+            # Procura link de exportar para Excel
+            self.logger.info("Procurando link de exportação...")
+            export_selectors = [
+                "a.btnExport.btnExportToExcel",
+                "a[href*='excel']",
+                "//a[contains(text(), 'Excel')]",
+                ".export-excel",
+                "#export-excel"
+            ]
+            
+            export_link = None
+            for selector in export_selectors:
+                try:
+                    if selector.startswith("//"):
+                        export_link = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                    else:
+                        export_link = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+                        )
+                    break
+                except TimeoutException:
+                    continue
+            
+            if not export_link:
+                raise Exception("Link de exportação não encontrado")
+            
+            if not self.safe_click(export_link, "link de exportação"):
+                return False
+            
+            time.sleep(3)
+            
+            # Configura opções de exportação se disponível
+            try:
+                self.logger.info("Configurando opções de exportação...")
+                select_element = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "select.col-xs-12.input-mv-new.md-confirm-options, select[name*='export'], select.export-options"))
+                )
+                
+                select = Select(select_element)
+                # Tenta selecionar a opção "Todas as ações na mesma coluna" (valor 3)
+                try:
+                    select.select_by_value("3")
+                    self.logger.info("Opção de exportação configurada")
+                except:
+                    self.logger.warning("Não foi possível configurar opção específica, usando padrão")
+                
+                # Clica no botão OK/Confirmar
+                ok_selectors = [
+                    "button.btn-mv.btn-mv-confirm.md-confirm-action.trigger-service-nps[data-value='ok']",
+                    "button[data-value='ok']",
+                    "//button[text()='OK']",
+                    ".btn-confirm",
+                    "#confirm-export"
+                ]
+                
+                ok_button = None
+                for selector in ok_selectors:
+                    try:
+                        if selector.startswith("//"):
+                            ok_button = WebDriverWait(self.driver, 5).until(
+                                EC.element_to_be_clickable((By.XPATH, selector))
+                            )
+                        else:
+                            ok_button = WebDriverWait(self.driver, 5).until(
+                                EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+                            )
+                        break
+                    except TimeoutException:
+                        continue
+                
+                if ok_button:
+                    self.safe_click(ok_button, "botão OK")
+                
+            except TimeoutException:
+                self.logger.info("Nenhuma configuração adicional necessária")
+            
+            self.logger.info("Aguardando download...")
+            return self.wait_for_download()
+            
+        except Exception as e:
+            self.logger.error(f"Erro durante exportação: {str(e)}")
+            self.take_screenshot("export_error")
+            return False
+    
+    def wait_for_download(self) -> bool:
+        """Aguarda o download ser concluído."""
+        try:
+            start_time = time.time()
+            
+            while time.time() - start_time < self.config.download_wait_timeout:
+                # Verifica arquivos Excel no diretório
+                excel_files = list(self.config.download_dir.glob("*.xlsx"))
+                
+                if excel_files:
+                    # Verifica se o arquivo não está sendo baixado (não tem .crdownload)
+                    temp_files = list(self.config.download_dir.glob("*.crdownload"))
+                    
+                    if not temp_files:
+                        # Pega o arquivo mais recente
+                        latest_file = max(excel_files, key=lambda f: f.stat().st_mtime)
+                        
+                        # Verifica se o arquivo tem tamanho razoável
+                        if latest_file.stat().st_size > 1024:  # Maior que 1KB
+                            self.logger.info(f"Download concluído: {latest_file.name} ({latest_file.stat().st_size} bytes)")
+                            
+                            # Analisa o arquivo
+                            stats = self.analyzer.analyze_excel(latest_file)
+                            self.logger.info(f"Análise concluída: {stats['tickets_ativos']} tickets ativos de {stats['total_tickets']} total")
+                            
+                            return True
+                
+                time.sleep(2)
+            
+            self.logger.error("Timeout aguardando download")
             return False
             
-    except Exception as e:
-        print(f"Erro durante o login e download: {str(e)}")
-        # Tira um screenshot em caso de erro
+        except Exception as e:
+            self.logger.error(f"Erro aguardando download: {str(e)}")
+            return False
+    
+    def run(self) -> bool:
+        """Executa o processo completo de automação."""
         try:
-            screenshot_path = os.path.join(download_dir, "erro.png")
-            driver.save_screenshot(screenshot_path)
-            print(f"Screenshot salvo em: {screenshot_path}")
-        except:
-            print("Não foi possível salvar o screenshot")
-        return False
+            # Valida configurações
+            self.config.validate()
+            
+            # Inicializa o driver
+            if not self.initialize_driver():
+                return False
+            
+            try:
+                # Realiza login
+                if not self.login():
+                    return False
+                
+                # Exporta para Excel
+                if not self.export_to_excel():
+                    return False
+                
+                self.logger.info("Processo de automação concluído com sucesso")
+                return True
+                
+            finally:
+                # Fecha o driver
+                if self.driver:
+                    self.driver.quit()
+                    self.logger.info("Driver Chrome fechado")
+            
+        except Exception as e:
+            self.logger.error(f"Erro durante execução: {str(e)}")
+            self.take_screenshot("error")
+            return False
 
 def main():
     """Função principal."""
     try:
-        print("Iniciando automação...")
-        driver, download_dir = iniciar_navegador()
-        if driver and download_dir:
-            login_e_download(driver, download_dir)
+        # Configura logging
+        logger = setup_logging()
+        logger.info("Iniciando automação...")
+        
+        # Cria instâncias
+        config = Config()
+        automation = SeleniumAutomation(config, logger)
+        
+        # Executa automação
+        success = automation.run()
+        
+        if success:
+            logger.info("Automação concluída com sucesso")
+            return 0
         else:
-            print("ERRO: Não foi possível iniciar o navegador.")
+            logger.error("Automação falhou")
+            return 1
+            
     except Exception as e:
-        print(f"ERRO durante a execução: {str(e)}")
-    finally:
-        if 'driver' in locals():
-            print("\nFechando o navegador...")
-            driver.quit()
-        print("Execução finalizada.")
+        print(f"Erro fatal: {str(e)}")
+        return 1
 
 if __name__ == "__main__":
-    main()
+    exit(main())
