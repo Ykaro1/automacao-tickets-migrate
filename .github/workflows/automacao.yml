@@ -47,14 +47,14 @@ jobs:
       run: python automacao_selenium.py
     
     - name: Upload Excel file
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: tickets-excel
         path: downloads/*.xlsx
     
     - name: Upload error screenshot
       if: failure()
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: error-screenshot
         path: downloads/erro*.png
