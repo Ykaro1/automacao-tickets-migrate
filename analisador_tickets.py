@@ -42,12 +42,14 @@ class TicketAnalyzer:
         
         # Carrega ou cria arquivo de memória
         self.memory = self._load_memory()
+        logging.info(f"Memória carregada com {len(self.memory)} tickets")
     
     def _load_memory(self) -> Dict:
         """Carrega o arquivo de memória ou cria um novo."""
         if self.memory_file.exists():
             with open(self.memory_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
+        logging.info("Arquivo de memória não encontrado, criando novo")
         return {}
     
     def _save_memory(self):
@@ -142,7 +144,9 @@ class TicketAnalyzer:
                 json=payload
             )
             
-            if response.status_code != 200:
+            if response.status_code == 200:
+                logging.info("Mensagem enviada com sucesso para o Slack")
+            else:
                 logging.error(f"Erro ao enviar para Slack: {response.text}")
                 
         except Exception as e:
@@ -152,6 +156,7 @@ class TicketAnalyzer:
         """Verifica se a ação é de um autor interno."""
         for autor in self.autores_internos:
             if autor.strip() in action_text:
+                logging.info(f"Ação é de autor interno: {autor}")
                 return True
         return False
     
@@ -160,11 +165,18 @@ class TicketAnalyzer:
         try:
             # Lê o CSV
             df = pd.read_csv(csv_file, encoding='latin1', sep=';')
+            logging.info(f"CSV lido com {len(df)} tickets")
             
             # Filtra tickets não fechados/resolvidos
             df = df[~df['Status'].isin(['Fechado', 'Resolvido'])]
+            logging.info(f"Após filtrar, {len(df)} tickets ativos")
+            
+            tickets_analisados = 0
+            tickets_com_mudanca = 0
+            tickets_enviados = 0
             
             for _, ticket in df.iterrows():
+                tickets_analisados += 1
                 ticket_id = str(ticket['Número'])
                 last_action_date = ticket['Data da última ação']
                 actions = ticket['Ações']
@@ -173,11 +185,15 @@ class TicketAnalyzer:
                 if ticket_id in self.memory:
                     # Verifica se houve alteração na data da última ação
                     if self.memory[ticket_id]['last_action_date'] != last_action_date:
+                        tickets_com_mudanca += 1
+                        logging.info(f"Ticket #{ticket_id} tem nova ação em {last_action_date}")
+                        
                         # Pega a última ação
                         last_action = self._get_last_action(actions)
                         if last_action:
                             # Verifica se não é autor interno
                             if not self._is_internal_author(last_action):
+                                tickets_enviados += 1
                                 # Formata com Gemini
                                 formatted_text = self._format_with_gemini(last_action)
                                 
@@ -192,6 +208,8 @@ class TicketAnalyzer:
                                 
                                 # Envia para Slack
                                 self._send_to_slack(message)
+                            else:
+                                logging.info(f"Ticket #{ticket_id} tem ação de autor interno, ignorando")
                             
                             # Atualiza memória
                             self.memory[ticket_id] = {
@@ -200,6 +218,7 @@ class TicketAnalyzer:
                             }
                 else:
                     # Novo ticket, adiciona à memória
+                    logging.info(f"Novo ticket #{ticket_id} encontrado")
                     last_action = self._get_last_action(actions)
                     self.memory[ticket_id] = {
                         'last_action_date': last_action_date,
@@ -208,6 +227,14 @@ class TicketAnalyzer:
             
             # Salva memória
             self._save_memory()
+            
+            # Log final
+            logging.info(f"""
+            Resumo da análise:
+            - Tickets analisados: {tickets_analisados}
+            - Tickets com mudança: {tickets_com_mudanca}
+            - Tickets enviados para Slack: {tickets_enviados}
+            """)
             
         except Exception as e:
             logging.error(f"Erro ao analisar tickets: {str(e)}")
