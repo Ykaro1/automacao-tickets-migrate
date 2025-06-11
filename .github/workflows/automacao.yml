@@ -13,6 +13,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Necessário para o git diff funcionar corretamente
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -77,6 +79,21 @@ jobs:
         
         # Executar automação
         python automacao_selenium.py
+        
+    - name: Commit and push if CSV changed
+      run: |
+        git config --global user.name 'GitHub Actions'
+        git config --global user.email 'github-actions@github.com'
+        
+        # Verificar se o arquivo CSV foi modificado
+        if git diff --quiet acompanhamento_tickets.csv; then
+          echo "Nenhuma mudança no arquivo CSV"
+        else
+          echo "Arquivo CSV modificado, fazendo commit..."
+          git add acompanhamento_tickets.csv
+          git commit -m "Atualização automática do arquivo de acompanhamento de tickets [skip ci]"
+          git push
+        fi
         
     - name: Upload logs on failure
       if: failure()
