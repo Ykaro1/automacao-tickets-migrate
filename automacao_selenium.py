@@ -6,6 +6,9 @@ import os
 import time
 import logging
 import pandas as pd
+import json
+import requests
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
@@ -59,6 +62,8 @@ class Config:
         self.migrate_senha = os.getenv("MIGRATE_SENHA")
         self.debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
         self.github_run_id = os.getenv("GITHUB_RUN_ID", "local")
+        self.slack_webhook = os.getenv("SLACK_WEBHOOK_URL")
+        self.slack_channel = os.getenv("SLACK_CHANNEL")
         
         # Timeouts
         self.page_load_timeout = 30
@@ -504,6 +509,147 @@ class SeleniumAutomation:
             self.logger.error(f"Erro aguardando download: {str(e)}")
             return False
     
+    def compare_ticket_data(self) -> Tuple[bool, Dict[str, Any]]:
+        """Compara os dados dos tickets com a última execução."""
+        memory_file = Path("data/ticket_memory.json")
+        current_file = self.config.download_dir / "file.xlsx"
+        
+        try:
+            # Verifica se o arquivo atual existe
+            if not current_file.exists():
+                self.logger.error(f"Arquivo atual não encontrado: {current_file}")
+                return False, {}
+
+            # Lê os dados atuais
+            try:
+                df = pd.read_excel(current_file)
+            except Exception as e:
+                self.logger.error(f"Erro ao ler arquivo Excel: {str(e)}")
+                return False, {}
+
+            current_data = {
+                'total_tickets': len(df),
+                'tickets_ativos': len(df[df['Status'] == 'Ativo']),
+                'data_execucao': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'status_breakdown': df['Status'].value_counts().to_dict(),
+                'hash_arquivo': self._calculate_file_hash(current_file)
+            }
+            
+            # Tenta ler o arquivo de memória do último commit
+            try:
+                if memory_file.exists():
+                    with open(memory_file, 'r', encoding='utf-8') as f:
+                        previous_data = json.load(f)
+                    
+                    # Compara dados incluindo o hash do arquivo
+                    has_changes = (
+                        current_data['total_tickets'] != previous_data.get('total_tickets', 0) or
+                        current_data['tickets_ativos'] != previous_data.get('tickets_ativos', 0) or
+                        current_data['status_breakdown'] != previous_data.get('status_breakdown', {}) or
+                        current_data['hash_arquivo'] != previous_data.get('hash_arquivo', '')
+                    )
+                    
+                    if has_changes:
+                        self.logger.info("Detectadas alterações nos tickets:")
+                        if current_data['total_tickets'] != previous_data.get('total_tickets', 0):
+                            self.logger.info(f"- Total de tickets alterado: {previous_data.get('total_tickets', 0)} -> {current_data['total_tickets']}")
+                        if current_data['tickets_ativos'] != previous_data.get('tickets_ativos', 0):
+                            self.logger.info(f"- Tickets ativos alterados: {previous_data.get('tickets_ativos', 0)} -> {current_data['tickets_ativos']}")
+                else:
+                    self.logger.info("Primeira execução - não há arquivo de memória anterior")
+                    has_changes = True  # Primeira execução
+                
+            # Salva os dados atuais
+            memory_file.parent.mkdir(exist_ok=True)
+            with open(memory_file, 'w', encoding='utf-8') as f:
+                json.dump(current_data, f, ensure_ascii=False, indent=4)
+            
+            return has_changes, current_data
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao comparar dados dos tickets: {str(e)}")
+            return False, {}
+
+    def send_to_slack(self, data: Dict[str, Any]) -> bool:
+        """Envia atualização para o Slack."""
+        if not self.config.slack_webhook:
+            self.logger.warning("Webhook do Slack não configurado")
+            return False
+        
+        try:
+            status_text = "\n".join([f"- {status}: {count}" for status, count in data['status_breakdown'].items()])
+            
+            message = {
+                "channel": self.config.slack_channel,
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "📊 Atualização de Tickets Migrate"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Data da execução:* {data['data_execucao']}\n"
+                                   f"*Total de tickets:* {data['total_tickets']}\n"
+                                   f"*Tickets ativos:* {data['tickets_ativos']}\n\n"
+                                   f"*Distribuição por status:*\n{status_text}"
+                        }
+                    }
+                ]
+            }
+            
+            response = requests.post(
+                self.config.slack_webhook,
+                json=message,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                self.logger.info("Mensagem enviada com sucesso para o Slack")
+                return True
+            else:
+                self.logger.error(f"Erro ao enviar para Slack: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Erro ao enviar para Slack: {str(e)}")
+            return False
+    
+    def commit_changes(self) -> bool:
+        """Faz commit das alterações no arquivo de memória e logs."""
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Comandos git para adicionar e commitar as alterações
+            commands = [
+                "git add data/ticket_memory.json",
+                "git add logs/*",
+                f'git commit -m "📊 Atualização de tickets - {timestamp}"'
+            ]
+            
+            for command in commands:
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True
+                )
+                
+                if result.returncode != 0:
+                    self.logger.error(f"Erro ao executar '{command}': {result.stderr}")
+                    return False
+                    
+            self.logger.info("Alterações commitadas com sucesso")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao fazer commit das alterações: {str(e)}")
+            return False
+
     def run(self) -> bool:
         """Executa o processo completo de automação."""
         try:
@@ -523,6 +669,22 @@ class SeleniumAutomation:
                 if not self.export_to_csv():
                     return False
                 
+                # Verifica se houve alterações
+                has_changes, current_data = self.compare_ticket_data()
+                
+                if has_changes:
+                    # Envia para o Slack se configurado
+                    if self.config.slack_webhook:
+                        if not self.send_to_slack(current_data):
+                            self.logger.warning("Falha ao enviar notificação para o Slack")
+                    
+                    # Faz commit das alterações se estiver rodando no GitHub Actions
+                    if os.getenv("GITHUB_ACTIONS") == "true":
+                        if not self.commit_changes():
+                            self.logger.warning("Falha ao fazer commit das alterações")
+                else:
+                    self.logger.info("Nenhuma alteração detectada nos tickets")
+                
                 self.logger.info("Processo de automação concluído com sucesso")
                 return True
                 
@@ -536,6 +698,20 @@ class SeleniumAutomation:
             self.logger.error(f"Erro durante execução: {str(e)}")
             self.take_screenshot("error")
             return False
+
+    def _calculate_file_hash(self, file_path: Path) -> str:
+        """Calcula o hash SHA256 do arquivo."""
+        import hashlib
+        
+        try:
+            sha256_hash = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                for byte_block in iter(lambda: f.read(4096), b""):
+                    sha256_hash.update(byte_block)
+            return sha256_hash.hexdigest()
+        except Exception as e:
+            self.logger.error(f"Erro ao calcular hash do arquivo: {str(e)}")
+            return ""
 
 def main():
     """Função principal."""
