@@ -91,6 +91,14 @@ jobs:
         # Executar automação
         python automacao_selenium.py
         
+    - name: Upload downloaded file for debugging
+      if: always()  # Executa este passo mesmo se os anteriores falharem
+      uses: actions/upload-artifact@v4
+      with:
+        name: downloaded-files
+        path: downloads/
+        retention-days: 5
+        
     - name: Check for changes
       run: |
         echo "Verificando alterações no arquivo de tickets:"

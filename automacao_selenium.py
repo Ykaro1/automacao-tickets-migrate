@@ -31,7 +31,7 @@ AUTORES_INTERNOS_STR = os.getenv("AUTORES_INTERNOS", "")
 AUTORES_INTERNOS = [autor.strip() for autor in AUTORES_INTERNOS_STR.split(',') if autor.strip()]
 
 # Nome do arquivo para guardar o estado dos tickets acompanhados
-ARQUIVO_ACOMPANHAMENTO = "acompanhamento_tickets.csv"
+ARQUIVO_ACOMPANHAMENTO = "tickets_em_acompanhamento.csv"
 
 def verificar_variaveis_ambiente():
     """Verifica se todas as variáveis de ambiente necessárias estão configuradas."""
@@ -130,7 +130,7 @@ def login_e_download(driver, email, senha):
         ok_button.click()
         
         print("Download iniciado. Aguardando conclusão...")
-        for _ in range(12):
+        for _ in range(30):
             time.sleep(5)
             if any(f.endswith('.xlsx') for f in os.listdir(os.path.abspath("downloads"))):
                 print("Download do arquivo Excel concluído!")
@@ -147,15 +147,31 @@ def ler_e_processar_excel(download_dir):
     try:
         arquivos_excel = [f for f in os.listdir(download_dir) if f.endswith('.xlsx')]
         if not arquivos_excel:
-            print("ERRO: Nenhum arquivo Excel (.xlsx) encontrado no diretório de downloads."); return None
+            print("ERRO: Nenhum arquivo Excel (.xlsx) encontrado no diretório de downloads.")
+            return None
         
         caminho_arquivo = os.path.join(download_dir, max(arquivos_excel, key=lambda x: os.path.getmtime(os.path.join(download_dir, x))))
         print(f"Lendo o arquivo: {os.path.basename(caminho_arquivo)}")
-        df = pd.read_excel(caminho_arquivo)
+        
+        try:
+            df = pd.read_excel(caminho_arquivo)
+        except Exception as e:
+            print(f"ERRO: Falha ao ler o arquivo Excel com pandas: {e}")
+            # Tenta ler o início do arquivo como texto para depuração
+            try:
+                with open(caminho_arquivo, 'r', errors='ignore') as f:
+                    print("--- Início do conteúdo do arquivo baixado (para depuração) ---")
+                    print(f.read(500))
+                    print("--- Fim do conteúdo do arquivo baixado ---")
+            except Exception as read_err:
+                print(f"Não foi possível ler o conteúdo do arquivo para depuração: {read_err}")
+            return None
 
         colunas_necessarias = ['Número', 'Status', 'Ações', 'Data da última ação', 'Assunto', 'Responsável']
         if any(col not in df.columns for col in colunas_necessarias):
-            print(f"ERRO: Colunas essenciais não encontradas."); return None
+            print("ERRO: Colunas essenciais não encontradas no arquivo Excel.")
+            print(f"Colunas encontradas: {df.columns.tolist()}")
+            return None
 
         for col in ['Assunto', 'Responsável', 'Status']:
             df[col] = df[col].astype(str).str.strip()
@@ -163,9 +179,11 @@ def ler_e_processar_excel(download_dir):
         for col in ['Número', 'Ações', 'Data da última ação']:
             df[col] = df[col].astype(str).fillna('N/A')
         
-        print(f"Arquivo lido com sucesso. Total de {len(df)} tickets encontrados."); return df
+        print(f"Arquivo lido com sucesso. Total de {len(df)} tickets encontrados.")
+        return df
     except Exception as e:
-        print(f"ERRO CRÍTICO ao ler ou processar o arquivo Excel: {str(e)}"); return None
+        print(f"ERRO CRÍTICO ao ler ou processar o arquivo Excel: {str(e)}")
+        return None
 
 def extrair_ultima_acao_e_autor(acoes_texto):
     """Extrai o texto da última ação e o nome do seu autor. Retorna uma tupla (texto_da_acao, nome_do_autor)."""
