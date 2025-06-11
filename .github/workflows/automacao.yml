@@ -62,13 +62,13 @@ jobs:
       run: |
         python automacao_selenium.py
     
-    - name: Verificar arquivo Excel
+    - name: Verificar arquivo CSV
       run: |
-        if [ ! -f "downloads/file.xlsx" ]; then
-          echo "❌ Arquivo Excel não foi gerado"
+        if [ ! -f "downloads/file.csv" ]; then
+          echo "❌ Arquivo CSV não foi gerado"
           exit 1
         fi
-        echo "✅ Arquivo Excel gerado com sucesso"
+        echo "✅ Arquivo CSV gerado com sucesso"
     
     - name: Gerar log de tickets ativos
       run: |
@@ -79,7 +79,7 @@ jobs:
       with:
         name: relatorio-automacao
         path: |
-          downloads/file.xlsx
+          downloads/file.csv
           logs/tickets_ativos.log
           logs/automacao.log
         if-no-files-found: error
@@ -95,5 +95,5 @@ jobs:
     - name: Limpar arquivos temporários
       if: always()
       run: |
-        rm -rf downloads/*.xlsx
+        rm -rf downloads/*.csv
         rm -rf screenshots/*

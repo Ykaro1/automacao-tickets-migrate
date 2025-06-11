@@ -335,14 +335,14 @@ class SeleniumAutomation:
             
             self.logger.info("Login realizado com sucesso")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Erro durante login: {str(e)}")
             self.take_screenshot("login_error")
             return False
     
-    def export_to_excel(self) -> bool:
-        """Exporta os dados para Excel."""
+    def export_to_csv(self) -> bool:
+        """Exporta os dados para CSV."""
         try:
             self.logger.info("Iniciando processo de exportação...")
             
@@ -379,14 +379,14 @@ class SeleniumAutomation:
             
             time.sleep(2)
             
-            # Procura link de exportar para Excel
+            # Procura link de exportar para CSV
             self.logger.info("Procurando link de exportação...")
             export_selectors = [
-                "a.btnExport.btnExportToExcel",
-                "a[href*='excel']",
-                "//a[contains(text(), 'Excel')]",
-                ".export-excel",
-                "#export-excel"
+                "a.btnExport.btnExportToCsv",
+                "a[href*='csv']",
+                "//a[contains(text(), 'CSV')]",
+                ".export-csv",
+                "#export-csv"
             ]
             
             export_link = None
@@ -471,16 +471,16 @@ class SeleniumAutomation:
             start_time = time.time()
             
             while time.time() - start_time < self.config.download_wait_timeout:
-                # Verifica arquivos Excel no diretório
-                excel_files = list(self.config.download_dir.glob("*.xlsx"))
+                # Verifica arquivos CSV no diretório
+                csv_files = list(self.config.download_dir.glob("*.csv"))
                 
-                if excel_files:
+                if csv_files:
                     # Verifica se o arquivo não está sendo baixado (não tem .crdownload)
                     temp_files = list(self.config.download_dir.glob("*.crdownload"))
                     
                     if not temp_files:
                         # Pega o arquivo mais recente
-                        latest_file = max(excel_files, key=lambda f: f.stat().st_mtime)
+                        latest_file = max(csv_files, key=lambda f: f.stat().st_mtime)
                         
                         # Verifica se o arquivo tem tamanho razoável
                         if latest_file.stat().st_size > 1024:  # Maior que 1KB
@@ -516,8 +516,8 @@ class SeleniumAutomation:
                 if not self.login():
                     return False
                 
-                # Exporta para Excel
-                if not self.export_to_excel():
+                # Exporta para CSV
+                if not self.export_to_csv():
                     return False
                 
                 self.logger.info("Processo de automação concluído com sucesso")
@@ -554,7 +554,7 @@ def main():
         else:
             logger.error("Automação falhou")
             return 1
-            
+
     except Exception as e:
         print(f"Erro fatal: {str(e)}")
         return 1

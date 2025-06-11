@@ -8,8 +8,8 @@ from datetime import datetime
 
 def gerar_log_tickets():
     try:
-        # Lê o arquivo Excel
-        df = pd.read_excel("downloads/file.xlsx")
+        # Lê o arquivo CSV
+        df = pd.read_csv("downloads/file.csv", encoding='utf-8')
         
         # Filtra tickets ativos
         ativos = df[df["Status"] == "Ativo"]
