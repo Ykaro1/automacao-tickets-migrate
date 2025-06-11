@@ -62,6 +62,16 @@ jobs:
         echo "Chrome version: $(google-chrome --version)"
         echo "ChromeDriver version: $(chromedriver --version)"
         
+    - name: Check tickets file
+      run: |
+        echo "Verificando arquivo de tickets em acompanhamento:"
+        if [ -f tickets_em_acompanhamento.csv ]; then
+          echo "Arquivo encontrado. Conteúdo atual:"
+          cat tickets_em_acompanhamento.csv
+        else
+          echo "Arquivo não encontrado. Será criado durante a execução."
+        fi
+        
     - name: Run automation
       env:
         MIGRATE_EMAIL: ${{ secrets.MIGRATE_EMAIL }}
@@ -81,18 +91,32 @@ jobs:
         # Executar automação
         python automacao_selenium.py
         
-    - name: Commit and push if CSV changed
+    - name: Check for changes
+      run: |
+        echo "Verificando alterações no arquivo de tickets:"
+        if [ -f tickets_em_acompanhamento.csv ]; then
+          if git diff --quiet tickets_em_acompanhamento.csv; then
+            echo "Nenhuma alteração detectada no arquivo de tickets"
+          else
+            echo "Alterações detectadas no arquivo de tickets:"
+            git diff tickets_em_acompanhamento.csv
+          fi
+        else
+          echo "ERRO: Arquivo de tickets não foi criado durante a execução"
+          exit 1
+        fi
+        
+    - name: Commit and push if changed
       run: |
         git config --global user.name 'GitHub Actions'
         git config --global user.email 'github-actions@github.com'
         
-        # Verificar se o arquivo CSV foi modificado
-        if git diff --quiet acompanhamento_tickets.csv; then
-          echo "Nenhuma mudança no arquivo CSV"
+        if git diff --quiet tickets_em_acompanhamento.csv; then
+          echo "Nenhuma alteração para commitar"
         else
-          echo "Arquivo CSV modificado, fazendo commit..."
-          git add acompanhamento_tickets.csv
-          git commit -m "Atualização automática do arquivo de acompanhamento de tickets [skip ci]"
+          echo "Fazendo commit das alterações no arquivo de tickets..."
+          git add tickets_em_acompanhamento.csv
+          git commit -m "Atualização automática dos tickets em acompanhamento [skip ci]"
           git push
         fi
         
