@@ -33,8 +33,43 @@ def verificar_variaveis_ambiente():
         return False
     return True
 
+def analisar_excel(arquivo_excel):
+    """Analisa o arquivo Excel e conta os tickets ativos."""
+    try:
+        print(f"\nAnalisando arquivo: {arquivo_excel}")
+        # Lê o arquivo Excel
+        df = pd.read_excel(arquivo_excel)
+        
+        # Verifica se a coluna 'Status' existe
+        if 'Status' not in df.columns:
+            print("ERRO: Coluna 'Status' não encontrada no arquivo Excel")
+            print(f"Colunas encontradas: {df.columns.tolist()}")
+            return
+        
+        # Filtra os tickets que não estão fechados ou resolvidos
+        tickets_ativos = df[~df['Status'].isin(['Fechado', 'Resolvido'])]
+        
+        # Conta quantos tickets ativos existem
+        total_ativos = len(tickets_ativos)
+        
+        print(f"\nTotal de tickets ativos: {total_ativos}")
+        
+        # Mostra os status únicos dos tickets ativos
+        print("\nStatus únicos dos tickets ativos:")
+        for status in tickets_ativos['Status'].unique():
+            count = len(tickets_ativos[tickets_ativos['Status'] == status])
+            print(f"- {status}: {count} tickets")
+        
+        # Mostra os primeiros 5 tickets ativos
+        if total_ativos > 0:
+            print("\nPrimeiros 5 tickets ativos:")
+            print(tickets_ativos[['Número', 'Status', 'Título']].head().to_string())
+        
+    except Exception as e:
+        print(f"ERRO ao analisar o arquivo Excel: {str(e)}")
+
 def iniciar_navegador():
-    """Inicia o navegador Chrome em modo headless."""
+    """Inicia o navegador Chrome."""
     try:
         # Configura o diretório de downloads
         download_dir = os.path.abspath("downloads")
@@ -43,7 +78,7 @@ def iniciar_navegador():
         
         # Configura as opções do Chrome
         chrome_options = Options()
-        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--start-maximized")  # Maximiza a janela
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
@@ -68,35 +103,43 @@ def iniciar_navegador():
         print(f"ERRO ao iniciar o navegador: {str(e)}")
         return None, None
 
-def login_e_download(driver, email, senha):
-    """Realiza o login na plataforma e faz o download do relatório de tickets."""
+def login_e_download(driver, download_dir):
+    """Realiza o login e faz o download do arquivo."""
     try:
-        print("Iniciando o navegador Chrome em modo headless...")
-        # Corrigindo a URL para o domínio correto
-        driver.get("https://atendimento.migrate.com.br/Ticket")
-        time.sleep(15)  # Aumentado para 15 segundos
-        
+        # Acessa a página de login
         print("Inserindo credenciais...")
-        # Aguarda e preenche o campo de email
+        driver.get("https://atendimento.migrate.com.br/Ticket")
+        time.sleep(10)  # Aumentado para 10 segundos
+        
+        # Aguarda e preenche o email
+        print("Procurando campo de e-mail...")
         email_input = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input.username-input-login-service"))
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text']"))
         )
-        email_input.clear()
-        email_input.send_keys(email)
+        email_input.clear()  # Limpa o campo antes de inserir
+        time.sleep(1)  # Pequena pausa após limpar
+        email_input.send_keys(MIGRATE_EMAIL)
+        print("E-mail inserido com sucesso")
         
-        # Aguarda e preenche o campo de senha
-        senha_input = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input.password-input-login-service"))
+        # Aguarda e preenche a senha
+        print("Procurando campo de senha...")
+        password_input = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
         )
-        senha_input.clear()
-        senha_input.send_keys(senha)
+        password_input.clear()  # Limpa o campo antes de inserir
+        time.sleep(1)  # Pequena pausa após limpar
+        password_input.send_keys(MIGRATE_SENHA)
+        print("Senha inserida com sucesso")
         
-        # Aguarda e clica no botão de login
+        # Clica no botão de login
+        print("Procurando botão de login...")
         login_button = WebDriverWait(driver, 20).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "button.button-login"))
         )
         login_button.click()
+        print("Botão de login clicado")
         
+        # Aguarda o carregamento da página
         print("Login realizado. Aguardando carregamento da página...")
         time.sleep(10)  # Aumentado para 10 segundos
         
@@ -107,92 +150,107 @@ def login_e_download(driver, email, senha):
             )
             confirm_button.click()
             print("Tela de confirmação encontrada e confirmada.")
-        except TimeoutException:
-            print("Nenhuma tela de confirmação apareceu. Continuando...")
+        except:
+            print("Nenhuma tela de confirmação encontrada.")
         
-        # Aguarda carregamento da página principal
-        time.sleep(15)  # Aumentado para 15 segundos
+        # Aguarda mais um pouco para garantir que a página carregou completamente
+        time.sleep(5)
         
-        # Tenta encontrar o botão OPÇÕES usando JavaScript
+        # Procura e clica no botão OPÇÕES
         print("Procurando botão OPÇÕES...")
-        opcoes_button = driver.execute_script("""
-            return Array.from(document.querySelectorAll('*')).find(el => 
-                el.textContent.includes('OPÇÕES') && 
-                (el.tagName === 'BUTTON' || el.tagName === 'SPAN' || el.tagName === 'DIV')
-            );
-        """)
-        
-        if not opcoes_button:
-            raise Exception("Botão OPÇÕES não encontrado")
-        
+        opcoes_button = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.XPATH, "//span[contains(@class, 'button-text') and text()='OPÇÕES']"))
+        )
         print("Botão OPÇÕES encontrado, clicando...")
-        driver.execute_script("arguments[0].click();", opcoes_button)
-        time.sleep(5)
+        opcoes_button.click()
         
-        # Tenta encontrar o botão EXPORTAR usando JavaScript
-        print("Procurando botão EXPORTAR...")
-        exportar_button = driver.execute_script("""
-            return Array.from(document.querySelectorAll('*')).find(el => 
-                el.textContent.includes('EXPORTAR') && 
-                (el.tagName === 'BUTTON' || el.tagName === 'SPAN' || el.tagName === 'DIV')
-            );
-        """)
+        # Aguarda um pouco após clicar em OPÇÕES
+        time.sleep(2)
         
-        if not exportar_button:
-            raise Exception("Botão EXPORTAR não encontrado")
+        # Procura e clica no link de exportar para Excel
+        print("Procurando link de exportar para Excel...")
+        exportar_link = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "a.btnExport.btnExportToExcel"))
+        )
+        print("Link de exportar encontrado, clicando...")
+        exportar_link.click()
         
-        print("Botão EXPORTAR encontrado, clicando...")
-        driver.execute_script("arguments[0].click();", exportar_button)
-        time.sleep(5)
+        # Aguarda o modal de opções aparecer
+        time.sleep(2)
         
-        # Tenta encontrar o botão EXCEL usando JavaScript
-        print("Procurando botão EXCEL...")
-        excel_button = driver.execute_script("""
-            return Array.from(document.querySelectorAll('*')).find(el => 
-                el.textContent.includes('EXCEL') && 
-                (el.tagName === 'BUTTON' || el.tagName === 'SPAN' || el.tagName === 'DIV')
-            );
-        """)
+        # Seleciona a opção "Todas as ações na mesma coluna"
+        print("Selecionando opção de exportação...")
+        select_element = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "select.col-xs-12.input-mv-new.md-confirm-options"))
+        )
+        select = Select(select_element)
+        select.select_by_value("3")  # Valor 3 corresponde a "Todas as ações na mesma coluna"
+        print("Opção selecionada com sucesso")
         
-        if not excel_button:
-            raise Exception("Botão EXCEL não encontrado")
-        
-        print("Botão EXCEL encontrado, clicando...")
-        driver.execute_script("arguments[0].click();", excel_button)
+        # Clica no botão OK
+        print("Procurando botão OK...")
+        ok_button = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "button.btn-mv.btn-mv-confirm.md-confirm-action.trigger-service-nps[data-value='ok']"))
+        )
+        ok_button.click()
+        print("Botão OK clicado")
         
         # Aguarda o download
-        print("Aguardando download do arquivo...")
+        print("Aguardando download...")
         time.sleep(30)  # Aumentado para 30 segundos
         
-        return True
+        # Verifica se o arquivo foi baixado
+        print("Verificando arquivos no diretório de downloads...")
+        arquivos = os.listdir(download_dir)
+        print(f"Arquivos encontrados: {arquivos}")
         
+        # Tenta encontrar o arquivo Excel mais recente
+        arquivos_excel = [f for f in arquivos if f.endswith('.xlsx')]
+        if arquivos_excel:
+            # Pega o arquivo mais recente
+            arquivo_excel = max(arquivos_excel, key=lambda x: os.path.getctime(os.path.join(download_dir, x)))
+            print(f"Arquivo baixado com sucesso: {arquivo_excel}")
+            
+            # Analisa o arquivo Excel
+            caminho_completo = os.path.join(download_dir, arquivo_excel)
+            analisar_excel(caminho_completo)
+            
+            return True
+        else:
+            print("Nenhum arquivo Excel encontrado no diretório de downloads")
+            # Tira um screenshot para debug
+            screenshot_path = os.path.join(download_dir, "erro_download.png")
+            driver.save_screenshot(screenshot_path)
+            print(f"Screenshot salvo em: {screenshot_path}")
+            return False
+            
     except Exception as e:
         print(f"Erro durante o login e download: {str(e)}")
-        # Tenta tirar um screenshot em caso de erro
+        # Tira um screenshot em caso de erro
         try:
-            screenshot_path = os.path.join("downloads", "erro.png")
+            screenshot_path = os.path.join(download_dir, "erro.png")
             driver.save_screenshot(screenshot_path)
             print(f"Screenshot salvo em: {screenshot_path}")
         except:
-            print("Não foi possível salvar o screenshot do erro")
+            print("Não foi possível salvar o screenshot")
         return False
 
-if __name__ == "__main__":
-    driver = None
+def main():
+    """Função principal."""
     try:
-        if not verificar_variaveis_ambiente():
-            raise Exception("Variáveis de ambiente não configuradas.")
-            
+        print("Iniciando automação...")
         driver, download_dir = iniciar_navegador()
         if driver and download_dir:
-            login_e_download(driver, MIGRATE_EMAIL, MIGRATE_SENHA)
+            login_e_download(driver, download_dir)
         else:
             print("ERRO: Não foi possível iniciar o navegador.")
-
     except Exception as e:
-        print(f"\n--- ERRO CRÍTICO NA EXECUÇÃO DO SCRIPT: {e} ---")
+        print(f"ERRO durante a execução: {str(e)}")
     finally:
-        if driver:
+        if 'driver' in locals():
             print("\nFechando o navegador...")
             driver.quit()
         print("Execução finalizada.")
+
+if __name__ == "__main__":
+    main()
