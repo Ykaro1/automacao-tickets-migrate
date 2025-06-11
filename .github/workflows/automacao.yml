@@ -10,55 +10,59 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
     
     - name: Install Chrome
       run: |
+        sudo apt-get update
+        sudo apt-get install -y wget gnupg2
         wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
+        google-chrome --version
     
     - name: Install ChromeDriver
       run: |
-        if command -v google-chrome > /dev/null; then
-          CHROME_BIN=google-chrome
-        elif command -v google-chrome-stable > /dev/null; then
-          CHROME_BIN=google-chrome-stable
-        else
-          echo "Google Chrome não encontrado!"
-          exit 1
-        fi
-        CHROME_VERSION=$($CHROME_BIN --version | awk '{print $3}' | cut -d'.' -f1)
+        CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d'.' -f1)
+        echo "Chrome version: $CHROME_VERSION"
         CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")
+        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
         wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip"
         unzip chromedriver_linux64.zip
         sudo mv chromedriver /usr/local/bin/
         sudo chmod +x /usr/local/bin/chromedriver
+        chromedriver --version
     
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install selenium pandas openpyxl python-dotenv
+        pip install -r requirements.txt
     
     - name: Create .env file
       run: |
         echo "MIGRATE_EMAIL=${{ secrets.MIGRATE_EMAIL }}" >> .env
         echo "MIGRATE_SENHA=${{ secrets.MIGRATE_SENHA }}" >> .env
     
+    - name: Create downloads directory
+      run: mkdir -p downloads
+    
     - name: Run automation
-      run: python automacao_selenium.py
+      run: |
+        python automacao_selenium.py
+        ls -la downloads/
     
     - name: Upload Excel file
       uses: actions/upload-artifact@v4
       with:
         name: tickets-excel
         path: downloads/*.xlsx
+        if-no-files-found: warn
     
     - name: Upload error screenshot
       if: failure()
@@ -66,3 +70,4 @@ jobs:
       with:
         name: error-screenshot
         path: downloads/erro*.png
+        if-no-files-found: warn
