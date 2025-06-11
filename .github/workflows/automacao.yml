@@ -70,17 +70,12 @@ jobs:
         fi
         echo "✅ Arquivo CSV gerado com sucesso"
     
-    - name: Gerar log de tickets ativos
-      run: |
-        python gerar_log_tickets.py
-    
     - name: Upload de artefatos
       uses: actions/upload-artifact@v4
       with:
         name: relatorio-automacao
         path: |
           downloads/file.csv
-          logs/tickets_ativos.log
           logs/automacao.log
         if-no-files-found: error
     
