@@ -305,6 +305,75 @@ def analisar_e_notificar_mudancas(df_atual):
     df_ativos_para_salvar.to_csv(ARQUIVO_ACOMPANHAMENTO, index=False)
     print(f"'{ARQUIVO_ACOMPANHAMENTO}' atualizado com {len(df_ativos)} tickets ativos.")
 
+def download_relatorio(self):
+    """Realiza o download do relatório"""
+    try:
+        print("Navegando para o download do relatório...")
+        self.driver.get("https://app.migrate.com.br/relatorios")
+        time.sleep(15)  # Aumentado para 15 segundos
+        
+        # Tenta encontrar o botão OPÇÕES usando JavaScript
+        print("Procurando botão OPÇÕES...")
+        opcoes_button = self.driver.execute_script("""
+            return Array.from(document.querySelectorAll('*')).find(el => 
+                el.textContent.includes('OPÇÕES') && 
+                (el.tagName === 'BUTTON' || el.tagName === 'SPAN' || el.tagName === 'DIV')
+            );
+        """)
+        
+        if not opcoes_button:
+            raise Exception("Botão OPÇÕES não encontrado")
+        
+        print("Botão OPÇÕES encontrado, clicando...")
+        self.driver.execute_script("arguments[0].click();", opcoes_button)
+        time.sleep(5)
+        
+        # Tenta encontrar o botão EXPORTAR usando JavaScript
+        print("Procurando botão EXPORTAR...")
+        exportar_button = self.driver.execute_script("""
+            return Array.from(document.querySelectorAll('*')).find(el => 
+                el.textContent.includes('EXPORTAR') && 
+                (el.tagName === 'BUTTON' || el.tagName === 'SPAN' || el.tagName === 'DIV')
+            );
+        """)
+        
+        if not exportar_button:
+            raise Exception("Botão EXPORTAR não encontrado")
+        
+        print("Botão EXPORTAR encontrado, clicando...")
+        self.driver.execute_script("arguments[0].click();", exportar_button)
+        time.sleep(5)
+        
+        # Tenta encontrar o botão EXCEL usando JavaScript
+        print("Procurando botão EXCEL...")
+        excel_button = self.driver.execute_script("""
+            return Array.from(document.querySelectorAll('*')).find(el => 
+                el.textContent.includes('EXCEL') && 
+                (el.tagName === 'BUTTON' || el.tagName === 'SPAN' || el.tagName === 'DIV')
+            );
+        """)
+        
+        if not excel_button:
+            raise Exception("Botão EXCEL não encontrado")
+        
+        print("Botão EXCEL encontrado, clicando...")
+        self.driver.execute_script("arguments[0].click();", excel_button)
+        
+        # Aguarda o download
+        print("Aguardando download do arquivo...")
+        time.sleep(30)  # Aumentado para 30 segundos
+        
+        return True
+        
+    except TimeoutException as e:
+        print(f"Timeout: {str(e)}")
+        self.take_screenshot("erro_timeout")
+        return False
+    except Exception as e:
+        print(f"Erro durante o download: {str(e)}")
+        self.take_screenshot("erro_download")
+        return False
+
 if __name__ == "__main__":
     driver = None
     try:
