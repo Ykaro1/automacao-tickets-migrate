@@ -1,140 +1,60 @@
-name: Automação de Tickets
+name: Automação Tickets Migrate
 
 on:
+  schedule:
+    - cron: '0 8 * * *'  # Executa todos os dias às 8h
   workflow_dispatch:  # Permite execução manual
-
-permissions:
-  contents: write  # Permissão para fazer push
 
 jobs:
   automacao:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # Timeout para evitar execuções infinitas
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Necessário para o git diff funcionar corretamente
+    - uses: actions/checkout@v2
     
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v2
       with:
-        python-version: '3.11'
-        
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-        
-    - name: Install Chrome and ChromeDriver
+        python-version: '3.10'
+    
+    - name: Install Chrome
       run: |
-        # Instalar Chrome for Testing
-        CHROME_VERSION="137.0.7151.70"
-        CHROME_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64/chrome-linux64.zip"
-        CHROMEDRIVER_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64/chromedriver-linux64.zip"
-        
-        # Baixar e instalar Chrome
-        wget -q "$CHROME_URL" -O chrome.zip
-        unzip chrome.zip
-        sudo mv chrome-linux64/* /usr/local/bin/
-        
-        # Baixar e instalar ChromeDriver
-        wget -q "$CHROMEDRIVER_URL" -O chromedriver.zip
-        unzip chromedriver.zip
-        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
+        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+    
+    - name: Install ChromeDriver
+      run: |
+        CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d'.' -f1)
+        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")
+        wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip"
+        unzip chromedriver_linux64.zip
+        sudo mv chromedriver /usr/local/bin/
         sudo chmod +x /usr/local/bin/chromedriver
-        
-        # Verificar versões
-        echo "Chrome version: $(google-chrome --version)"
-        echo "ChromeDriver version: $(chromedriver --version)"
-        
-    - name: Install Python dependencies
+    
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Verify environment
+        pip install selenium pandas openpyxl python-dotenv
+    
+    - name: Create .env file
       run: |
-        echo "Python version: $(python --version)"
-        echo "Chrome version: $(google-chrome --version)"
-        echo "ChromeDriver version: $(chromedriver --version)"
-        
-    - name: Check tickets file
-      run: |
-        echo "Verificando arquivo de tickets em acompanhamento:"
-        if [ -f tickets_em_acompanhamento.csv ]; then
-          echo "Arquivo encontrado. Conteúdo atual:"
-          cat tickets_em_acompanhamento.csv
-        else
-          echo "Arquivo não encontrado. Será criado durante a execução."
-        fi
-        
+        echo "MIGRATE_EMAIL=${{ secrets.MIGRATE_EMAIL }}" >> .env
+        echo "MIGRATE_SENHA=${{ secrets.MIGRATE_SENHA }}" >> .env
+    
     - name: Run automation
-      env:
-        MIGRATE_EMAIL: ${{ secrets.MIGRATE_EMAIL }}
-        MIGRATE_SENHA: ${{ secrets.MIGRATE_SENHA }}
-        GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
-        AUTORES_INTERNOS: ${{ secrets.AUTORES_INTERNOS }}
-        # Configurações adicionais para ambiente headless
-        DISPLAY: :99
-        CHROME_BIN: /usr/local/bin/google-chrome
-      run: |
-        # Iniciar display virtual para testes headless
-        export DISPLAY=:99
-        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-        
-        # Executar automação
-        python automacao_selenium.py
-        
-    - name: Upload downloaded file for debugging
-      if: always()  # Executa este passo mesmo se os anteriores falharem
-      uses: actions/upload-artifact@v4
+      run: python automacao_selenium.py
+    
+    - name: Upload Excel file
+      uses: actions/upload-artifact@v2
       with:
-        name: downloaded-files
-        path: downloads/
-        retention-days: 5
-        
-    - name: Check for changes
-      run: |
-        echo "Verificando alterações no arquivo de tickets:"
-        if [ -f tickets_em_acompanhamento.csv ]; then
-          if git diff --quiet tickets_em_acompanhamento.csv; then
-            echo "Nenhuma alteração detectada no arquivo de tickets"
-          else
-            echo "Alterações detectadas no arquivo de tickets:"
-            git diff tickets_em_acompanhamento.csv
-          fi
-        else
-          echo "ERRO: Arquivo de tickets não foi criado durante a execução"
-          exit 1
-        fi
-        
-    - name: Commit and push if changed
-      run: |
-        git config --global user.name 'GitHub Actions'
-        git config --global user.email 'github-actions@github.com'
-        
-        if git diff --quiet tickets_em_acompanhamento.csv; then
-          echo "Nenhuma alteração para commitar"
-        else
-          echo "Fazendo commit das alterações no arquivo de tickets..."
-          git add tickets_em_acompanhamento.csv
-          git commit -m "Atualização automática dos tickets em acompanhamento [skip ci]"
-          git push
-        fi
-        
-    - name: Upload logs on failure
+        name: tickets-excel
+        path: downloads/*.xlsx
+    
+    - name: Upload error screenshot
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2
       with:
-        name: automation-logs
-        path: |
-          *.log
-          screenshots/
-        retention-days: 7
+        name: error-screenshot
+        path: downloads/erro*.png
