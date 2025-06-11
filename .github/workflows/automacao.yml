@@ -69,6 +69,7 @@ jobs:
         GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+        AUTORES_INTERNOS: ${{ secrets.AUTORES_INTERNOS }}
         # Configurações adicionais para ambiente headless
         DISPLAY: :99
         CHROME_BIN: /usr/local/bin/google-chrome
