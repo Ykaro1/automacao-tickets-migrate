@@ -70,12 +70,9 @@ jobs:
         fi
         echo "✅ Arquivo Excel gerado com sucesso"
     
-    - name: Criar log de tickets ativos
+    - name: Gerar log de tickets ativos
       run: |
-        echo "📊 Relatório de Tickets Ativos" > logs/tickets_ativos.log
-        echo "Data: $(date)" >> logs/tickets_ativos.log
-        echo "----------------------------------------" >> logs/tickets_ativos.log
-        python -c 'import pandas as pd; import sys; try: df = pd.read_excel("downloads/file.xlsx"); ativos = df[df["Status"] == "Ativo"]; print(f"Total de tickets ativos: {len(ativos)}"); print("\nDetalhes dos tickets ativos:"); [print(f"\nTicket: {ticket.get(\"Número\", \"N/A\")}\nAssunto: {ticket.get(\"Assunto\", \"N/A\")}\nResponsável: {ticket.get(\"Responsável\", \"N/A\")}\nData de criação: {ticket.get(\"Data de criação\", \"N/A\")}\n----------------------------------------") for _, ticket in ativos.iterrows()] except Exception as e: print(f"Erro ao processar arquivo: {str(e)}"); sys.exit(1)' >> logs/tickets_ativos.log
+        python gerar_log_tickets.py
     
     - name: Upload de artefatos
       uses: actions/upload-artifact@v4
