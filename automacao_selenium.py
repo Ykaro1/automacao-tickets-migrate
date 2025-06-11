@@ -5,6 +5,10 @@ from datetime import datetime
 import requests
 import json
 import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Carrega as variáveis de ambiente do arquivo .env
+load_dotenv()
 
 # --- Bibliotecas do Selenium (mantidas do seu código original) ---
 from selenium import webdriver
@@ -246,9 +250,58 @@ def ler_excel_recente(download_dir):
             print(f"ERRO: Arquivo {caminho_arquivo} está vazio!")
             return None
         
+        # Lê o Excel e mostra informações sobre as colunas
         df = pd.read_excel(caminho_arquivo)
         
-        print("\nPrimeiras 5 linhas do arquivo original:")
+        print("\nInformações sobre o arquivo Excel:")
+        print(f"Total de linhas: {len(df)}")
+        print(f"Total de colunas: {len(df.columns)}")
+        print("\nColunas encontradas:")
+        for col in df.columns:
+            print(f"- {col}")
+        
+        # Verifica se as colunas necessárias existem
+        colunas_necessarias = ['Número', 'Status', 'Ações', 'Data da última ação']
+        colunas_faltantes = [col for col in colunas_necessarias if col not in df.columns]
+        
+        if colunas_faltantes:
+            print(f"\nERRO: Colunas necessárias não encontradas: {colunas_faltantes}")
+            print("Colunas disponíveis:", df.columns.tolist())
+            return None
+        
+        # Limpa e padroniza os dados
+        print("\nLimpando e padronizando os dados...")
+        
+        # Converte todas as colunas para string e trata valores nulos
+        for col in df.columns:
+            df[col] = df[col].astype(str).fillna('N/A')
+        
+        # Análise detalhada da coluna Status
+        print("\nAnálise da coluna Status:")
+        
+        # Remove espaços extras e padroniza o status
+        df['Status'] = df['Status'].str.strip().str.title()
+        
+        # Mostra todos os status únicos encontrados
+        status_unicos = df['Status'].unique()
+        print("\nStatus únicos encontrados:")
+        for status in sorted(status_unicos):
+            print(f"- {status}")
+        
+        # Mostra estatísticas dos status
+        print("\nDistribuição dos status:")
+        status_counts = df['Status'].value_counts()
+        for status, count in status_counts.items():
+            print(f"- {status}: {count} tickets ({count/len(df)*100:.1f}%)")
+        
+        # Verifica status problemáticos
+        status_problematicos = df[df['Status'].str.contains('N/A|nan|None', case=False, na=False)]
+        if not status_problematicos.empty:
+            print("\nATENÇÃO: Encontrados tickets com status problemáticos:")
+            for idx, row in status_problematicos.iterrows():
+                print(f"- Ticket #{row['Número']}: Status = '{row['Status']}'")
+        
+        print("\nPrimeiras 5 linhas do arquivo processado:")
         print(df.head())
         
         return df
@@ -258,25 +311,93 @@ def ler_excel_recente(download_dir):
         return None
 
 def analisar_com_ia(texto_acao, api_key):
-    """Envia o texto da ação para a IA do Google para gerar um resumo."""
+    """Analisa o texto da ação usando a API do Google Gemini."""
     try:
-        print(f"   - Enviando ação para análise da IA...")
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
         
-        prompt = f"""
-        Resuma a seguinte atualização de um ticket de suporte em uma única frase, como se fosse um status rápido para uma equipe.
-        Seja direto e informativo.
+        # Configuração dos modelos
+        modelos = {
+            'resumo_rapido': 'gemini-1.5-flash',  # Resposta clara e concisa
+            'analise_detalhada': 'gemini-2.0-flash-exp',  # Resposta mais detalhada e bem estruturada
+            'analise_tecnica': 'gemini-1.5-flash-8b',  # Resposta técnica e precisa
+            'analise_geral': 'gemini-2.0-flash-lite'  # Resposta equilibrada e bem formatada
+        }
         
-        Texto da atualização:
-        "{texto_acao}"
+        # Primeiro, faz uma análise rápida para determinar o tipo de conteúdo
+        model_rapido = genai.GenerativeModel(modelos['resumo_rapido'])
+        prompt_rapido = f"""
+        Analise rapidamente este texto e determine se é:
+        1. Uma ação técnica (configuração, código, erro)
+        2. Uma atualização de status
+        3. Uma comunicação com usuário
+        4. Outro tipo de ação
 
-        Resumo:
+        Texto: "{texto_acao[:500]}"
+
+        Responda apenas com o número (1, 2, 3 ou 4).
         """
         
+        tipo_acao = model_rapido.generate_content(prompt_rapido).text.strip()
+        
+        # Escolhe o modelo apropriado baseado no tipo de ação
+        if tipo_acao == '1':
+            modelo = modelos['analise_tecnica']
+            prompt = f"""
+            Analise tecnicamente esta ação de ticket e forneça:
+            1. Tipo de ação técnica (configuração, código, erro)
+            2. Componentes afetados
+            3. Impacto técnico
+            4. Próximos passos recomendados
+
+            Texto da ação: "{texto_acao}"
+
+            Formate a resposta de forma técnica e precisa.
+            """
+        elif tipo_acao == '2':
+            modelo = modelos['resumo_rapido']
+            prompt = f"""
+            Forneça um resumo conciso desta atualização de status:
+            1. Status anterior
+            2. Status novo
+            3. Razão da mudança
+
+            Texto: "{texto_acao}"
+
+            Mantenha a resposta clara e direta.
+            """
+        elif tipo_acao == '3':
+            modelo = modelos['analise_geral']
+            prompt = f"""
+            Analise esta comunicação com o usuário e forneça:
+            1. Tipo de comunicação (resposta, solicitação, esclarecimento)
+            2. Pontos principais abordados
+            3. Ações necessárias
+            4. Próximos passos
+
+            Texto: "{texto_acao}"
+
+            Formate a resposta de forma equilibrada e bem estruturada.
+            """
+        else:
+            modelo = modelos['analise_detalhada']
+            prompt = f"""
+            Analise detalhadamente esta ação e forneça:
+            1. Contexto da ação
+            2. Principais pontos abordados
+            3. Decisões tomadas
+            4. Impacto no ticket
+            5. Próximos passos
+
+            Texto: "{texto_acao}"
+
+            Forneça uma análise detalhada e bem estruturada.
+            """
+        
+        # Gera a análise com o modelo escolhido
+        model = genai.GenerativeModel(modelo)
         response = model.generate_content(prompt)
         resumo = response.text.strip()
-        print(f"   - Resumo da IA: '{resumo}'")
+        print(f"   - Resumo da IA (Modelo: {modelo}): '{resumo}'")
         return resumo
     except Exception as e:
         print(f"   - ERRO ao contatar a IA: {str(e)}")
@@ -320,6 +441,16 @@ def enviar_notificacao_slack(webhook_url, channel, ticket):
                 }
             ]
         }
+
+        # Adiciona a análise de mudanças se disponível
+        if 'Análise_Mudanças' in ticket and ticket['Análise_Mudanças']:
+            payload["blocks"].append({
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Análise de Mudanças:*\n>{ticket['Análise_Mudanças']}"
+                }
+            })
         
         print(f"   - Enviando notificação para o Slack...")
         response = requests.post(webhook_url, data=json.dumps(payload), headers={'Content-Type': 'application/json'})
@@ -332,6 +463,36 @@ def enviar_notificacao_slack(webhook_url, channel, ticket):
     except Exception as e:
         print(f"   - ERRO GERAL ao tentar notificar: {str(e)}")
 
+def analisar_mudancas_acoes(acoes_antigas, acoes_atuais):
+    """
+    Analisa as mudanças nas ações usando a IA do Google para uma comparação mais precisa
+    """
+    try:
+        # Configura a API do Google
+        genai.configure(api_key=GOOGLE_AI_API_KEY)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        prompt = f"""
+        Compare estas duas sequências de ações e identifique:
+        1. Quais ações são novas
+        2. Se houve alterações em ações existentes
+        3. Se alguma ação foi removida
+
+        Ações Antigas:
+        {acoes_antigas}
+
+        Ações Atuais:
+        {acoes_atuais}
+
+        Responda em formato estruturado.
+        """
+        
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        print(f"Erro ao analisar mudanças nas ações: {str(e)}")
+        return None
+
 def analisar_e_acompanhar_tickets(df_atual):
     """Função principal que analisa, compara e dispara notificações."""
     if df_atual is None or df_atual.empty:
@@ -343,7 +504,8 @@ def analisar_e_acompanhar_tickets(df_atual):
     df_abertos_atual = df_atual[~df_atual['Status'].fillna('').isin(status_excluidos)].copy()
     
     # Garantir que as colunas principais não tenham valores nulos e sejam do tipo string
-    for col in ['Número', 'Ações', 'Status']:
+    colunas_importantes = ['Número', 'Ações', 'Status', 'Data da última ação']
+    for col in colunas_importantes:
         if col in df_abertos_atual.columns:
             df_abertos_atual[col] = df_abertos_atual[col].astype(str).fillna('N/A')
 
@@ -361,7 +523,6 @@ def analisar_e_acompanhar_tickets(df_atual):
     df_abertos_antigo = pd.read_csv(ARQUIVO_ACOMPANHAMENTO, dtype=str).fillna('N/A')
     
     # Unir os dataframes antigo e novo com base no número do ticket
-    # 'indicator=True' cria uma coluna '_merge' que nos diz a origem de cada linha
     df_merged = pd.merge(
         df_abertos_antigo, 
         df_abertos_atual, 
@@ -376,22 +537,50 @@ def analisar_e_acompanhar_tickets(df_atual):
     for index, row in df_merged.iterrows():
         # Caso 1: Ticket existia antes e ainda existe. VERIFICAR MUDANÇA.
         if row['_merge'] == 'both':
-            # Compara a coluna 'Ações' antiga com a nova
-            if row['Ações_antigo'] != row['Ações_atual']:
+            # Compara a data da última ação e as ações
+            data_antiga = row['Data da última ação_antigo']
+            data_atual = row['Data da última ação_atual']
+            acoes_antigas = row['Ações_antigo']
+            acoes_atuais = row['Ações_atual']
+
+            # Se a data da última ação mudou, faz uma análise mais profunda
+            if data_antiga != data_atual:
                 print(f"\n[!] MUDANÇA DETECTADA no Ticket #{row['Número']}")
-                ticket_info = {
-                    'Número': row['Número'],
-                    'Assunto': row['Assunto_atual'],
-                    'Responsável': row['Responsável_atual'],
-                    'Ações': row['Ações_atual']
-                }
-                enviar_notificacao_slack(SLACK_WEBHOOK_URL, SLACK_CHANNEL, ticket_info)
+                print(f"Data antiga: {data_antiga}")
+                print(f"Data nova: {data_atual}")
+                
+                # Analisa as mudanças nas ações usando IA
+                analise_mudancas = analisar_mudancas_acoes(acoes_antigas, acoes_atuais)
+                
+                if analise_mudancas:
+                    print(f"Análise das mudanças nas ações:")
+                    print(analise_mudancas)
+                    
+                    # Atualiza o ticket_info com a análise
+                    ticket_info = {
+                        'Número': row['Número'],
+                        'Assunto': row['Assunto_atual'],
+                        'Responsável': row['Responsável_atual'],
+                        'Ações': acoes_atuais,
+                        'Data_Última_Ação': data_atual,
+                        'Análise_Mudanças': analise_mudancas
+                    }
+                    
+                    # Envia notificação com a análise detalhada
+                    enviar_notificacao_slack(SLACK_WEBHOOK_URL, SLACK_CHANNEL, ticket_info)
 
         # Caso 2: Ticket é novo (só existe na planilha atual).
         elif row['_merge'] == 'right_only':
             print(f"\n[+] NOVO TICKET ABERTO DETECTADO: #{row['Número']}")
-            # Você pode decidir se quer notificar sobre novos tickets também
-            # Por enquanto, vamos apenas registrar.
+            # Notifica sobre novos tickets também
+            ticket_info = {
+                'Número': row['Número'],
+                'Assunto': row['Assunto_atual'],
+                'Responsável': row['Responsável_atual'],
+                'Ações': row['Ações_atual'],
+                'Data_Última_Ação': row['Data da última ação_atual']
+            }
+            enviar_notificacao_slack(SLACK_WEBHOOK_URL, SLACK_CHANNEL, ticket_info)
         
         # Caso 3: Ticket foi fechado/resolvido (só existia na planilha antiga).
         elif row['_merge'] == 'left_only':
