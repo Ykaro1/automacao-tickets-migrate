@@ -56,8 +56,8 @@ jobs:
     
     - name: Executar automação
       env:
-        EMAIL: ${{ secrets.EMAIL }}
-        SENHA: ${{ secrets.SENHA }}
+        MIGRATE_EMAIL: ${{ secrets.MIGRATE_EMAIL }}
+        MIGRATE_SENHA: ${{ secrets.MIGRATE_SENHA }}
         DEBUG_MODE: ${{ inputs.debug_mode }}
       run: |
         python automacao_selenium.py
