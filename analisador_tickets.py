@@ -36,8 +36,9 @@ class TicketAnalyzer:
         self.memory_file = Path("data/ticket_memory.json")
         self.autores_internos = os.getenv("AUTORES_INTERNOS", "").split(",")
         self.slack_webhook = os.getenv("SLACK_WEBHOOK_URL")
-        self.slack_channel = os.getenv("SLACK_CHANNEL") # Canal para notificações de tickets
-        self.slack_file_update_channel = os.getenv("SLACK_FILE_UPDATE_CHANNEL") # Canal para notificação de atualização do JSON
+        self.slack_default_channel = os.getenv("SLACK_CHANNEL")
+        self.slack_file_update_channel = os.getenv("SLACK_FILE_UPDATE_CHANNEL")
+        self.channel_map = self._load_channel_mapping()
         
         # Garante que o diretório data existe
         self.memory_file.parent.mkdir(exist_ok=True)
@@ -45,6 +46,17 @@ class TicketAnalyzer:
         # Carrega ou cria arquivo de memória
         self.memory = self._load_memory()
         logging.info(f"Memória carregada com {len(self.memory)} tickets")
+    
+    def _load_channel_mapping(self) -> Dict[str, str]:
+        """Carrega o mapeamento de autores para canais a partir de uma variável de ambiente JSON."""
+        mapping_json = os.getenv("SLACK_CHANNEL_MAPPING", "{}")
+        try:
+            mapping = json.loads(mapping_json)
+            logging.info(f"Mapeamento de canais carregado para {len(mapping)} autores.")
+            return mapping
+        except json.JSONDecodeError:
+            logging.error("Erro ao decodificar SLACK_CHANNEL_MAPPING. Verifique o formato JSON.")
+            return {}
     
     def _load_memory(self) -> Dict[str, Any]:
         """Carrega o arquivo de memória ou cria um novo se não existir."""
@@ -126,7 +138,7 @@ class TicketAnalyzer:
             logging.error("Webhook do Slack não configurado")
             return
             
-        target_channel = channel_override if channel_override else self.slack_channel
+        target_channel = channel_override if channel_override else self.slack_default_channel
         if not target_channel:
             logging.error("Nenhum canal do Slack especificado para a notificação.")
             return
@@ -135,7 +147,7 @@ class TicketAnalyzer:
             payload = {"channel": target_channel, "text": message, "username": "Monitor de Tickets", "icon_emoji": ":ticket:"}
             response = requests.post(self.slack_webhook, json=payload)
             if response.status_code != 200:
-                logging.error(f"Erro ao enviar para Slack: {response.text}")
+                logging.error(f"Erro ao enviar para Slack no canal {target_channel}: {response.text}")
         except Exception as e:
             logging.error(f"Erro ao enviar para Slack: {str(e)}")
     
@@ -153,7 +165,7 @@ class TicketAnalyzer:
         try:
             df = pd.read_csv(
                 csv_file, encoding='latin1', sep=';', on_bad_lines='warn',
-                engine='python', quoting=0, dtype={'Número': str, 'Status': str, 'Ações': str}
+                engine='python', quoting=0, dtype={'Número': str, 'Status': str, 'Ações': str, 'Cliente (Pessoa)': str}
             )
             logging.info(f"CSV completo lido com {len(df)} tickets")
 
@@ -162,6 +174,8 @@ class TicketAnalyzer:
             for _, ticket in df.iterrows():
                 ticket_id = str(ticket['Número'])
                 status = ticket['Status']
+                cliente_pessoa = ticket['Cliente (Pessoa)']
+                target_channel = self.channel_map.get(cliente_pessoa, self.slack_default_channel)
                 
                 # Extrai os detalhes da última ação
                 last_action_number, last_action = self._get_last_action_details(ticket['Ações'])
@@ -188,24 +202,24 @@ class TicketAnalyzer:
                             
                             if not is_active_now and was_active_before:
                                 title = f"✅ *Ticket #{ticket_id} foi Fechado/Resolvido*"
-                                logging.info(f"Ticket #{ticket_id} mudou para '{status}'. Notificando.")
+                                logging.info(f"Ticket #{ticket_id} mudou para '{status}'. Notificando canal {target_channel}.")
                             else:
                                 title = f"🔄 *Atualização no Ticket #{ticket_id}*"
-                                logging.info(f"Ticket #{ticket_id} (Status: {status}) tem nova ação.")
+                                logging.info(f"Ticket #{ticket_id} (Status: {status}) tem nova ação. Notificando canal {target_channel}.")
                             
                             message = f"{title}\n*Responsável:* {ticket['Responsável']}\n*Cliente:* {ticket['Cliente (Pessoa)']}\n*Status:* {status}\n*Última Ação:*\n{formatted_text}"
-                            self._send_to_slack(message)
+                            self._send_to_slack(message, channel_override=target_channel)
 
                 # CASO B: Ticket novo para o sistema
                 else:
                     if is_active_now:
                         has_changed = True
-                        logging.info(f"Novo ticket ativo #{ticket_id} encontrado.")
+                        logging.info(f"Novo ticket ativo #{ticket_id} encontrado. Notificando canal {target_channel}.")
                         
                         if not self._is_internal_author(last_action):
                             formatted_text = self._format_with_gemini(last_action)
                             message = f"✨ *Novo Ticket #{ticket_id}*\n*Responsável:* {ticket['Responsável']}\n*Cliente:* {ticket['Cliente (Pessoa)']}\n*Status:* {status}\n*Última Ação:*\n{formatted_text}"
-                            self._send_to_slack(message)
+                            self._send_to_slack(message, channel_override=target_channel)
                 
                 # Adiciona à nova memória APENAS se estiver ativo
                 if is_active_now:
