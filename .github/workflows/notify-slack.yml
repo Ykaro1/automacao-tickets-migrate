@@ -1,0 +1,90 @@
+name: Notificação de Mudanças no JSON
+
+on:
+  push:
+    paths:
+      - 'data/ticket_memory.json'
+    branches:
+      - main
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Precisamos do commit anterior para comparar mudanças
+      
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+      
+      - name: Enviar notificação para o Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+        run: |
+          python -c '
+          import json
+          import os
+          import requests
+          from datetime import datetime
+          
+          # Lê o arquivo JSON atual
+          with open("data/ticket_memory.json", "r", encoding="utf-8") as f:
+              current_data = json.load(f)
+          
+          # Prepara a mensagem
+          status_text = "\n".join([f"- {status}: {count}" for status, count in current_data["status_breakdown"].items()])
+          
+          message = {
+              "channel": os.getenv("SLACK_CHANNEL"),
+              "blocks": [
+                  {
+                      "type": "header",
+                      "text": {
+                          "type": "plain_text",
+                          "text": "🔄 Atualização de Tickets Migrate"
+                      }
+                  },
+                  {
+                      "type": "section",
+                      "text": {
+                          "type": "mrkdwn",
+                          "text": f"*Data da execução:* {current_data['data_execucao']}\n"
+                                 f"*Total de tickets:* {current_data['total_tickets']}\n"
+                                 f"*Tickets ativos:* {current_data['tickets_ativos']}\n\n"
+                                 f"*Distribuição por status:*\n{status_text}"
+                      }
+                  },
+                  {
+                      "type": "context",
+                      "elements": [
+                          {
+                              "type": "mrkdwn",
+                              "text": f"*Hash do arquivo:* `{current_data['hash_arquivo']}`"
+                          }
+                      ]
+                  }
+              ]
+          }
+          
+          # Envia para o Slack
+          response = requests.post(
+              os.getenv("SLACK_WEBHOOK_URL"),
+              json=message,
+              headers={"Content-Type": "application/json"}
+          )
+          
+          if response.status_code != 200:
+              print(f"Erro ao enviar para Slack: {response.text}")
+              exit(1)
+          ' 
