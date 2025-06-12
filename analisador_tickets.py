@@ -172,94 +172,103 @@ class TicketAnalyzer:
         return False
     
     def analyze_tickets(self, csv_file: str):
-        """Analisa os tickets do arquivo CSV."""
+        """
+        Analisa os tickets do arquivo CSV com lógica aprimorada para notificações e limpeza de memória.
+        """
         try:
-            # Lê o CSV de forma mais robusta
+            # 1. LER DADOS COMPLETOS
+            # Lê o CSV sem filtrar por status para garantir que vejamos as ações de fechamento.
             df = pd.read_csv(
                 csv_file,
                 encoding='latin1',
                 sep=';',
-                on_bad_lines='warn',  # Avisa sobre linhas com erro em vez de parar
-                engine='python',      # Usa o motor de parsing do Python, mais flexível
-                quoting=0,            # csv.QUOTE_MINIMAL, lida melhor com aspas
+                on_bad_lines='warn',
+                engine='python',
+                quoting=0,
                 dtype={
-                    'Número': str,    # Força o número do ticket como string
-                    'Status': str,    # Força o status como string
-                    'Ações': str      # Força as ações como string
+                    'Número': str,
+                    'Status': str,
+                    'Ações': str
                 }
             )
-            logging.info(f"CSV lido com {len(df)} tickets")
-            
-            # Filtra tickets não fechados/resolvidos
-            df = df[~df['Status'].isin(['Fechado', 'Resolvido'])]
-            logging.info(f"Após filtrar, {len(df)} tickets ativos")
-            
-            tickets_analisados = 0
-            tickets_com_mudanca = 0
-            tickets_enviados = 0
-            
+            logging.info(f"CSV completo lido com {len(df)} tickets")
+
+            # 2. PREPARAR MEMÓRIA
+            new_memory = {}
+            tickets_com_mudanca = False
+            tickets_notificados = 0
+
+            # 3. PROCESSAR CADA TICKET INDIVIDUALMENTE
             for _, ticket in df.iterrows():
-                tickets_analisados += 1
                 ticket_id = str(ticket['Número'])
                 last_action_date = ticket['Data da última ação']
+                status = ticket['Status']
                 actions = ticket['Ações']
                 
-                # Verifica se o ticket já está na memória
+                last_action = self._get_last_action(actions)
+                if not last_action:
+                    continue
+
+                # Lógica de Notificação para tickets existentes
                 if ticket_id in self.memory:
-                    # Verifica se houve alteração na data da última ação
                     if self.memory[ticket_id]['last_action_date'] != last_action_date:
-                        tickets_com_mudanca += 1
-                        logging.info(f"Ticket #{ticket_id} tem nova ação em {last_action_date}")
-                        
-                        # Pega a última ação
-                        last_action = self._get_last_action(actions)
-                        if last_action:
-                            # Verifica se não é autor interno
-                            if not self._is_internal_author(last_action):
-                                tickets_enviados += 1
-                                # Formata com Gemini
-                                formatted_text = self._format_with_gemini(last_action)
-                                
-                                # Prepara mensagem para Slack
-                                message = (
-                                    f"*Novo Ticket #{ticket_id}*\n"
-                                    f"*Responsável:* {ticket['Responsável']}\n"
-                                    f"*Cliente:* {ticket['Cliente (Pessoa)']}\n"
-                                    f"*Status:* {ticket['Status']}\n"
-                                    f"*Última Ação:*\n{formatted_text}"
-                                )
-                                
-                                # Envia para Slack
-                                self._send_to_slack(message)
-                            else:
-                                logging.info(f"Ticket #{ticket_id} tem ação de autor interno, ignorando")
-                            
-                            # Atualiza memória
-                            self.memory[ticket_id] = {
-                                'last_action_date': last_action_date,
-                                'last_action': last_action
-                            }
-                else:
-                    # Novo ticket, adiciona à memória
-                    logging.info(f"Novo ticket #{ticket_id} encontrado")
-                    last_action = self._get_last_action(actions)
-                    self.memory[ticket_id] = {
+                        logging.info(f"Ticket #{ticket_id} (Status: {status}) tem nova ação.")
+                        tickets_com_mudanca = True
+                        if not self._is_internal_author(last_action):
+                            formatted_text = self._format_with_gemini(last_action)
+                            message = (
+                                f"🔄 *Atualização no Ticket #{ticket_id}*\n"
+                                f"*Responsável:* {ticket['Responsável']}\n"
+                                f"*Cliente:* {ticket['Cliente (Pessoa)']}\n"
+                                f"*Status:* {status}\n"
+                                f"*Última Ação:*\n{formatted_text}"
+                            )
+                            self._send_to_slack(message)
+                            tickets_notificados += 1
+                # Lógica de Notificação para tickets novos
+                elif status not in ['Fechado', 'Resolvido']:
+                    logging.info(f"Novo ticket #{ticket_id} encontrado.")
+                    tickets_com_mudanca = True
+                    if not self._is_internal_author(last_action):
+                        formatted_text = self._format_with_gemini(last_action)
+                        message = (
+                            f"✨ *Novo Ticket #{ticket_id}*\n"
+                            f"*Responsável:* {ticket['Responsável']}\n"
+                            f"*Cliente:* {ticket['Cliente (Pessoa)']}\n"
+                            f"*Status:* {status}\n"
+                            f"*Última Ação:*\n{formatted_text}"
+                        )
+                        self._send_to_slack(message)
+                        tickets_notificados += 1
+
+                # 4. LÓGICA DE GESTÃO DA MEMÓRIA
+                # Adiciona o ticket na nova memória SOMENTE se ele não estiver fechado/resolvido.
+                if status not in ['Fechado', 'Resolvido']:
+                    new_memory[ticket_id] = {
                         'last_action_date': last_action_date,
                         'last_action': last_action
                     }
-            
-            # Salva memória
-            self._save_memory()
-            
+
+            # 5. ATUALIZAR E SALVAR A MEMÓRIA
+            # Verifica se a nova memória é diferente da antiga para evitar commits desnecessários.
+            if self.memory != new_memory:
+                logging.info("Memória de tickets foi alterada. Salvando novo estado.")
+                self.memory = new_memory
+                self._save_memory()
+            else:
+                logging.info("Nenhuma mudança na memória de tickets ativos.")
+
             # Log final
             logging.info(f"""
             Resumo da análise:
-            - Tickets analisados: {tickets_analisados}
+            - Total de tickets processados: {len(df)}
+            - Tickets ativos na memória: {len(new_memory)}
             - Tickets com mudança: {tickets_com_mudanca}
-            - Tickets enviados para Slack: {tickets_enviados}
+            - Tickets notificados: {tickets_notificados}
             """)
-            
+
             return True
+
         except Exception as e:
             logging.error(f"Erro ao analisar tickets: {str(e)}")
             return False
