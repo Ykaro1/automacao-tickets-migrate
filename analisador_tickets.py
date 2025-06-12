@@ -226,7 +226,7 @@ class TicketAnalyzer:
                             self._send_to_slack(message)
                             tickets_notificados += 1
                 # Lógica de Notificação para tickets novos
-                elif status not in ['Fechado', 'Resolvido']:
+                else:
                     logging.info(f"Novo ticket #{ticket_id} encontrado.")
                     tickets_com_mudanca = True
                     if not self._is_internal_author(last_action):
@@ -242,30 +242,21 @@ class TicketAnalyzer:
                         tickets_notificados += 1
 
                 # 4. LÓGICA DE GESTÃO DA MEMÓRIA
-                # Adiciona o ticket na nova memória SOMENTE se ele não estiver fechado/resolvido.
+                # Adiciona o ticket na nova memória SOMENTE se ele não estiver fechado/resolvido
                 if status not in ['Fechado', 'Resolvido']:
                     new_memory[ticket_id] = {
                         'last_action_date': last_action_date,
                         'last_action': last_action
                     }
 
-            # 5. ATUALIZAR E SALVAR A MEMÓRIA
-            # Verifica se a nova memória é diferente da antiga para evitar commits desnecessários.
-            if self.memory != new_memory:
-                logging.info("Memória de tickets foi alterada. Salvando novo estado.")
+            # 5. ATUALIZAÇÃO FINAL DA MEMÓRIA
+            if tickets_com_mudanca:
                 self.memory = new_memory
                 self._save_memory()
+                logging.info(f"Memória atualizada com {len(new_memory)} tickets ativos")
+                logging.info(f"Total de tickets notificados: {tickets_notificados}")
             else:
-                logging.info("Nenhuma mudança na memória de tickets ativos.")
-
-            # Log final
-            logging.info(f"""
-            Resumo da análise:
-            - Total de tickets processados: {len(df)}
-            - Tickets ativos na memória: {len(new_memory)}
-            - Tickets com mudança: {tickets_com_mudanca}
-            - Tickets notificados: {tickets_notificados}
-            """)
+                logging.info("Nenhuma mudança detectada nos tickets")
 
             return True
 
