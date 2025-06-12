@@ -35,7 +35,8 @@ class TicketAnalyzer:
     def __init__(self):
         self.memory_file = Path("data/ticket_memory.json")
         self.autores_internos = os.getenv("AUTORES_INTERNOS", "").split(",")
-        self.slack_webhook = os.getenv("SLACK_WEBHOOK_URL")
+        self.slack_webhook = os.getenv("SLACK_WEBHOOK_URL")  # Principal/Padrão
+        self.slack_dynamic_webhook = os.getenv("SLACK_DYNAMIC_WEBHOOK_URL")  # Para notificações de ticket
         self.slack_default_channel = os.getenv("SLACK_CHANNEL")
         self.slack_file_update_channel = os.getenv("SLACK_FILE_UPDATE_CHANNEL")
         self.channel_map = self._load_channel_mapping()
@@ -132,12 +133,19 @@ class TicketAnalyzer:
             logging.error(f"Erro ao formatar com Gemini: {str(e)}")
             return text
     
-    def _send_to_slack(self, message: str, channel_override: Optional[str] = None):
-        """Envia mensagem para o Slack."""
-        if not self.slack_webhook:
-            logging.error("Webhook do Slack não configurado")
+    def _send_to_slack(self, message: str, channel_override: Optional[str] = None, use_dynamic_webhook: bool = False):
+        """Envia mensagem para o Slack, selecionando o webhook apropriado."""
+        if use_dynamic_webhook and self.slack_dynamic_webhook:
+            webhook_url = self.slack_dynamic_webhook
+            logging.info("Usando webhook dinâmico.")
+        else:
+            webhook_url = self.slack_webhook
+            logging.info("Usando webhook principal.")
+
+        if not webhook_url:
+            logging.error("Nenhum webhook do Slack apropriado foi configurado para esta ação.")
             return
-            
+
         target_channel = channel_override if channel_override else self.slack_default_channel
         if not target_channel:
             logging.error("Nenhum canal do Slack especificado para a notificação.")
@@ -145,7 +153,7 @@ class TicketAnalyzer:
 
         try:
             payload = {"channel": target_channel, "text": message, "username": "Monitor de Tickets", "icon_emoji": ":ticket:"}
-            response = requests.post(self.slack_webhook, json=payload)
+            response = requests.post(webhook_url, json=payload)
             if response.status_code != 200:
                 logging.error(f"Erro ao enviar para Slack no canal {target_channel}: {response.text}")
         except Exception as e:
@@ -208,7 +216,7 @@ class TicketAnalyzer:
                                 logging.info(f"Ticket #{ticket_id} (Status: {status}) tem nova ação. Notificando canal {target_channel}.")
                             
                             message = f"{title}\n*Responsável:* {ticket['Responsável']}\n*Cliente:* {ticket['Cliente (Pessoa)']}\n*Status:* {status}\n*Última Ação:*\n{formatted_text}"
-                            self._send_to_slack(message, channel_override=target_channel)
+                            self._send_to_slack(message, channel_override=target_channel, use_dynamic_webhook=True)
 
                 # CASO B: Ticket novo para o sistema
                 else:
@@ -219,7 +227,7 @@ class TicketAnalyzer:
                         if not self._is_internal_author(last_action):
                             formatted_text = self._format_with_gemini(last_action)
                             message = f"✨ *Novo Ticket #{ticket_id}*\n*Responsável:* {ticket['Responsável']}\n*Cliente:* {ticket['Cliente (Pessoa)']}\n*Status:* {status}\n*Última Ação:*\n{formatted_text}"
-                            self._send_to_slack(message, channel_override=target_channel)
+                            self._send_to_slack(message, channel_override=target_channel, use_dynamic_webhook=True)
                 
                 # Adiciona à nova memória APENAS se estiver ativo
                 if is_active_now:
