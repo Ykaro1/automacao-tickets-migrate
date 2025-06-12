@@ -177,7 +177,6 @@ class TicketAnalyzer:
         """
         try:
             # 1. LER DADOS COMPLETOS
-            # Lê o CSV sem filtrar por status para garantir que vejamos as ações de fechamento.
             df = pd.read_csv(
                 csv_file,
                 encoding='latin1',
@@ -188,12 +187,13 @@ class TicketAnalyzer:
                 dtype={
                     'Número': str,
                     'Status': str,
-                    'Ações': str
+                    'Ações': str,
+                    'Data da última ação': str # Garantir que a data seja lida como texto
                 }
             )
             logging.info(f"CSV completo lido com {len(df)} tickets")
 
-            # 2. PREPARAR MEMÓRIA
+            # 2. PREPARAR NOVA MEMÓRIA
             new_memory = {}
             tickets_com_mudanca = False
             tickets_notificados = 0
@@ -209,15 +209,32 @@ class TicketAnalyzer:
                 if not last_action:
                     continue
 
-                # Lógica de Notificação para tickets existentes
+                is_active_now = status not in ['Fechado', 'Resolvido']
+
+                # CASO A: O ticket já estava sendo monitorado na nossa memória
                 if ticket_id in self.memory:
-                    if self.memory[ticket_id]['last_action_date'] != last_action_date:
-                        logging.info(f"Ticket #{ticket_id} (Status: {status}) tem nova ação.")
+                    has_date_changed = self.memory[ticket_id]['last_action_date'] != last_action_date
+                    was_active_before = self.memory[ticket_id].get('status', '') not in ['Fechado', 'Resolvido']
+
+                    # A notificação ocorre se a data da ação mudou.
+                    # Isso cobre tanto uma nova interação quanto a ação de fechamento.
+                    if has_date_changed:
                         tickets_com_mudanca = True
+                        
+                        # Verifica se a notificação deve ser enviada (não é de autor interno)
                         if not self._is_internal_author(last_action):
                             formatted_text = self._format_with_gemini(last_action)
+                            
+                            # Define o tipo de mensagem: se foi uma atualização ou se foi o encerramento
+                            if not is_active_now and was_active_before:
+                                title = f"✅ *Ticket #{ticket_id} foi Fechado/Resolvido*"
+                                logging.info(f"Ticket #{ticket_id} mudou para o status '{status}'. Notificando e removendo da memória.")
+                            else:
+                                title = f"🔄 *Atualização no Ticket #{ticket_id}*"
+                                logging.info(f"Ticket #{ticket_id} (Status: {status}) tem nova ação.")
+
                             message = (
-                                f"🔄 *Atualização no Ticket #{ticket_id}*\n"
+                                f"{title}\n"
                                 f"*Responsável:* {ticket['Responsável']}\n"
                                 f"*Cliente:* {ticket['Cliente (Pessoa)']}\n"
                                 f"*Status:* {status}\n"
@@ -225,25 +242,33 @@ class TicketAnalyzer:
                             )
                             self._send_to_slack(message)
                             tickets_notificados += 1
-                # Lógica de Notificação para tickets novos
+                
+                # CASO B: O ticket é novo para nós (não está na memória)
                 else:
-                    logging.info(f"Novo ticket #{ticket_id} encontrado.")
-                    tickets_com_mudanca = True
-                    if not self._is_internal_author(last_action):
-                        formatted_text = self._format_with_gemini(last_action)
-                        message = (
-                            f"✨ *Novo Ticket #{ticket_id}*\n"
-                            f"*Responsável:* {ticket['Responsável']}\n"
-                            f"*Cliente:* {ticket['Cliente (Pessoa)']}\n"
-                            f"*Status:* {status}\n"
-                            f"*Última Ação:*\n{formatted_text}"
-                        )
-                        self._send_to_slack(message)
-                        tickets_notificados += 1
+                    # SÓ vamos tratar como NOVO se ele estiver ATIVO.
+                    # Se ele já aparece como fechado no primeiro contato, ignoramos.
+                    if is_active_now:
+                        logging.info(f"Novo ticket ativo #{ticket_id} encontrado.")
+                        tickets_com_mudanca = True
+                        if not self._is_internal_author(last_action):
+                            formatted_text = self._format_with_gemini(last_action)
+                            message = (
+                                f"✨ *Novo Ticket #{ticket_id}*\n"
+                                f"*Responsável:* {ticket['Responsável']}\n"
+                                f"*Cliente:* {ticket['Cliente (Pessoa)']}\n"
+                                f"*Status:* {status}\n"
+                                f"*Última Ação:*\n{formatted_text}"
+                            )
+                            self._send_to_slack(message)
+                            tickets_notificados += 1
+                    else:
+                        logging.info(f"Ignorando ticket #{ticket_id}, pois é novo mas já está com status '{status}'.")
 
-                # 4. LÓGICA DE GESTÃO DA MEMÓRIA
-                # Adiciona o ticket na nova memória SOMENTE se ele não estiver fechado/resolvido
-                if status not in ['Fechado', 'Resolvido']:
+
+                # 4. LÓGICA FINAL DE GESTÃO DA MEMÓRIA
+                # Adiciona o ticket na nova memória SOMENTE se ele estiver ativo.
+                # Isso garante que tickets fechados sejam automaticamente removidos.
+                if is_active_now:
                     new_memory[ticket_id] = {
                         'last_action_date': last_action_date,
                         'status': status,
@@ -251,13 +276,14 @@ class TicketAnalyzer:
                     }
 
             # 5. ATUALIZAÇÃO FINAL DA MEMÓRIA
-            if tickets_com_mudanca:
+            # Compara a nova memória com a antiga para ver se houve real mudança
+            if self.memory != new_memory:
                 self.memory = new_memory
                 self._save_memory()
                 logging.info(f"Memória atualizada com {len(new_memory)} tickets ativos")
-                logging.info(f"Total de tickets notificados: {tickets_notificados}")
+                logging.info(f"Total de tickets notificados nesta execução: {tickets_notificados}")
             else:
-                logging.info("Nenhuma mudança detectada nos tickets")
+                logging.info("Nenhuma mudança estrutural na memória de tickets ativos detectada.")
 
             return True
 
