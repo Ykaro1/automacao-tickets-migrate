@@ -558,11 +558,18 @@ class SeleniumAutomation:
                 else:
                     self.logger.info("Primeira execução - não há arquivo de memória anterior")
                     has_changes = True  # Primeira execução
+            except Exception as e:
+                self.logger.error(f"Erro ao ler arquivo de memória: {str(e)}")
+                has_changes = True  # Em caso de erro, considera como mudança
                 
             # Salva os dados atuais
-            memory_file.parent.mkdir(exist_ok=True)
-            with open(memory_file, 'w', encoding='utf-8') as f:
-                json.dump(current_data, f, ensure_ascii=False, indent=4)
+            try:
+                memory_file.parent.mkdir(exist_ok=True)
+                with open(memory_file, 'w', encoding='utf-8') as f:
+                    json.dump(current_data, f, ensure_ascii=False, indent=4)
+            except Exception as e:
+                self.logger.error(f"Erro ao salvar arquivo de memória: {str(e)}")
+                return False, {}
             
             return has_changes, current_data
             
@@ -605,12 +612,14 @@ class SeleniumAutomation:
                             {
                                 "type": "mrkdwn",
                                 "text": f"*Hash do arquivo:* `{data['hash_arquivo']}`"
+                            }
+                        ]
                     }
                 ]
             }
             
             response = requests.post(
-                self.config.slack_webhook,
+                self.config.app.slack_webhook_url,
                 json=message,
                 headers={"Content-Type": "application/json"}
             )
