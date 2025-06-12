@@ -69,6 +69,7 @@ jobs:
           GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+          SLACK_CHANNEL_MAPPING: ${{ secrets.SLACK_CHANNEL_MAPPING }}
           SLACK_FILE_UPDATE_CHANNEL: ${{ secrets.SLACK_FILE_UPDATE_CHANNEL }}
           AUTORES_INTERNOS: ${{ secrets.AUTORES_INTERNOS }}
           DEBUG_MODE: ${{ inputs.debug_mode }}
