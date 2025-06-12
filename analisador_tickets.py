@@ -174,8 +174,20 @@ class TicketAnalyzer:
     def analyze_tickets(self, csv_file: str):
         """Analisa os tickets do arquivo CSV."""
         try:
-            # Lê o CSV
-            df = pd.read_csv(csv_file, encoding='latin1', sep=';')
+            # Lê o CSV de forma mais robusta
+            df = pd.read_csv(
+                csv_file,
+                encoding='latin1',
+                sep=';',
+                on_bad_lines='warn',  # Avisa sobre linhas com erro em vez de parar
+                engine='python',      # Usa o motor de parsing do Python, mais flexível
+                quoting=0,            # csv.QUOTE_MINIMAL, lida melhor com aspas
+                dtype={
+                    'Número': str,    # Força o número do ticket como string
+                    'Status': str,    # Força o status como string
+                    'Ações': str      # Força as ações como string
+                }
+            )
             logging.info(f"CSV lido com {len(df)} tickets")
             
             # Filtra tickets não fechados/resolvidos
@@ -247,9 +259,10 @@ class TicketAnalyzer:
             - Tickets enviados para Slack: {tickets_enviados}
             """)
             
+            return True
         except Exception as e:
             logging.error(f"Erro ao analisar tickets: {str(e)}")
-            raise
+            return False
 
 def main():
     """Função principal."""
