@@ -572,7 +572,7 @@ class SeleniumAutomation:
 
     def send_to_slack(self, data: Dict[str, Any]) -> bool:
         """Envia atualização para o Slack."""
-        if not self.config.slack_webhook:
+        if not self.config.app.slack_webhook_url:
             self.logger.warning("Webhook do Slack não configurado")
             return False
         
@@ -580,13 +580,13 @@ class SeleniumAutomation:
             status_text = "\n".join([f"- {status}: {count}" for status, count in data['status_breakdown'].items()])
             
             message = {
-                "channel": self.config.slack_channel,
+                "channel": self.config.app.slack_channel,
                 "blocks": [
                     {
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": "📊 Atualização de Tickets Migrate"
+                            "text": "🔄 Atualização de Tickets Migrate"
                         }
                     },
                     {
@@ -598,6 +598,13 @@ class SeleniumAutomation:
                                    f"*Tickets ativos:* {data['tickets_ativos']}\n\n"
                                    f"*Distribuição por status:*\n{status_text}"
                         }
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Hash do arquivo:* `{data['hash_arquivo']}`"
                     }
                 ]
             }

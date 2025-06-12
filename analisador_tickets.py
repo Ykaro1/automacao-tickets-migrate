@@ -8,7 +8,7 @@ import logging
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import google.generativeai as genai
 import requests
 from dotenv import load_dotenv
@@ -35,7 +35,8 @@ class TicketAnalyzer:
         self.memory_file = Path("data/ticket_memory.json")
         self.autores_internos = os.getenv("AUTORES_INTERNOS", "").split(",")
         self.slack_webhook = os.getenv("SLACK_WEBHOOK_URL")
-        self.slack_channel = os.getenv("SLACK_CHANNEL")
+        self.slack_channel = os.getenv("SLACK_CHANNEL") # Canal para notificações de tickets
+        self.slack_file_update_channel = os.getenv("SLACK_FILE_UPDATE_CHANNEL") # Canal para notificação de atualização do JSON
         
         # Garante que o diretório data existe
         self.memory_file.parent.mkdir(exist_ok=True)
@@ -44,16 +45,19 @@ class TicketAnalyzer:
         self.memory = self._load_memory()
         logging.info(f"Memória carregada com {len(self.memory)} tickets")
     
-    def _load_memory(self) -> Dict:
-        """Carrega o arquivo de memória ou cria um novo."""
-        if self.memory_file.exists():
-            with open(self.memory_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        logging.info("Arquivo de memória não encontrado, criando novo")
-        return {}
+    def _load_memory(self) -> Dict[str, Any]:
+        """Carrega o arquivo de memória ou cria um novo se não existir."""
+        try:
+            if self.memory_file.exists():
+                with open(self.memory_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            logging.error(f"Erro ao carregar memória: {str(e)}")
+            return {}
     
     def _save_memory(self):
-        """Salva o arquivo de memória e faz commit no GitHub."""
+        """Salva o arquivo de memória, faz commit, push e notifica no canal específico sobre a atualização."""
         # Salva o arquivo
         with open(self.memory_file, 'w', encoding='utf-8') as f:
             json.dump(self.memory, f, ensure_ascii=False, indent=2)
@@ -67,24 +71,27 @@ class TicketAnalyzer:
             # Adiciona o arquivo de memória
             subprocess.run(['git', 'add', str(self.memory_file)], check=True)
             
-            # Verifica se há mudanças
+            # Verifica se há mudanças para commitar
             result = subprocess.run(['git', 'diff', '--staged', '--quiet'], capture_output=True)
-            if result.returncode == 1:  # Há mudanças
+            if result.returncode == 1:  # Código 1 indica que há mudanças
                 # Faz o commit
-                subprocess.run([
-                    'git', 'commit', 
-                    '-m', f'chore: atualiza memória de tickets - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
-                ], check=True)
+                commit_message = f'chore: atualiza memória de tickets - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+                subprocess.run(['git', 'commit', '-m', commit_message], check=True)
                 
                 # Faz o push
                 subprocess.run(['git', 'push'], check=True)
                 logging.info("Memória atualizada e enviada para o GitHub")
+                
+                # Envia notificação sobre a atualização do arquivo para o canal específico
+                repo_url = f"{os.getenv('GITHUB_SERVER_URL', 'https://github.com')}/{os.getenv('GITHUB_REPOSITORY')}"
+                update_message = f"✅ O arquivo `ticket_memory.json` foi atualizado no repositório.\nConsulte as alterações em: {repo_url}/commits"
+                self._send_to_slack(update_message, channel_override=self.slack_file_update_channel)
+
             else:
                 logging.info("Nenhuma mudança na memória para commitar")
                 
         except subprocess.CalledProcessError as e:
             logging.error(f"Erro ao salvar memória no GitHub: {str(e)}")
-            # Continua mesmo com erro, pois o arquivo local foi salvo
     
     def _get_last_action(self, actions_text: str) -> Optional[str]:
         """Extrai a última ação do texto de ações."""
@@ -125,15 +132,21 @@ class TicketAnalyzer:
             logging.error(f"Erro ao formatar com Gemini: {str(e)}")
             return text
     
-    def _send_to_slack(self, message: str):
-        """Envia mensagem para o Slack."""
+    def _send_to_slack(self, message: str, channel_override: Optional[str] = None):
+        """Envia mensagem para o Slack. Permite a sobreposição do canal."""
         if not self.slack_webhook:
             logging.error("Webhook do Slack não configurado")
             return
             
+        # Determina o canal de destino: usa o override se fornecido, senão o padrão.
+        target_channel = channel_override if channel_override else self.slack_channel
+        if not target_channel:
+            logging.error("Nenhum canal do Slack especificado para a notificação.")
+            return
+
         try:
             payload = {
-                "channel": self.slack_channel,
+                "channel": target_channel,
                 "text": message,
                 "username": "Monitor de Tickets",
                 "icon_emoji": ":ticket:"
@@ -144,9 +157,7 @@ class TicketAnalyzer:
                 json=payload
             )
             
-            if response.status_code == 200:
-                logging.info("Mensagem enviada com sucesso para o Slack")
-            else:
+            if response.status_code != 200:
                 logging.error(f"Erro ao enviar para Slack: {response.text}")
                 
         except Exception as e:

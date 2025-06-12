@@ -43,6 +43,8 @@ class AppConfig:
     log_level: str = "INFO"
     max_log_files: int = 10
     log_rotation_size: str = "10MB"
+    slack_channel: str = "D0891NR1QRM"  # ID do canal do Slack
+    slack_webhook_url: str = ""  # Será preenchido via variável de ambiente
 
 
 class ConfigManager:
@@ -74,6 +76,13 @@ class ConfigManager:
         # Configurações de log
         if os.getenv("LOG_LEVEL"):
             self.app.log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+        
+        # Configurações do Slack
+        if os.getenv("SLACK_WEBHOOK_URL"):
+            self.app.slack_webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+        
+        if os.getenv("SLACK_CHANNEL"):
+            self.app.slack_channel = os.getenv("SLACK_CHANNEL")
     
     def get_chrome_options(self) -> Dict[str, Any]:
         """Retorna configurações otimizadas para o Chrome."""
