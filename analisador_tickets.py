@@ -246,6 +246,7 @@ class TicketAnalyzer:
                 if status not in ['Fechado', 'Resolvido']:
                     new_memory[ticket_id] = {
                         'last_action_date': last_action_date,
+                        'status': status,
                         'last_action': last_action
                     }
 
