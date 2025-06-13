@@ -1,4 +1,9 @@
 {
+  "144060": {
+    "last_action_number": 1,
+    "status": "Novo",
+    "last_action": "1 - Ação criada por Vinicius Garrido em 13/06/2025 18:35Boa tarde, tudo bem?Esse prestador está com um problema nas emissões de NFS-e, a prefeituraestá retornando a mensagem de rejeição abaixo:*Campo Chave Primária de Autenticação da Empresa não preenchido.*Eu verifiquei no InvOicy e o campo chave primária de autenticação realmentenão está preenchido, mas no dia 31/05/25 o prestador conseguiu emitir notasfiscais normalmente com as mesmas parametrizações. Vocês poderiam verificarse houve alguma mudança nas regras da prefeitura para emissão web service?Acesso da prefeitura:https://araraquara.ginfes.com.br/29.264.430/0001-00elia035*Vou passar as informações de uma NFS-e autorizada recentemente, e outra comerro.*NFS-e autorizada *31/05/25:Número RPS: 170Série: 1*NFSe com rejeição* 06/06/25:Número RPS: 176Série: 1Obrigado desde já.-- *AVISO DE CONFIDENCIALIDADE:*  Esta mensagem pode conter informações confidenciais e sujeitas a sigilo. A sua utilização, cópia e divulgação não autorizada são proibidas. Caso tenha recebido esta mensagem por engano, favor informar ao remetente e apagá-la, juntamente com seus anexos.***CONFIDENTIALITY NOTICE: *This message may contain confidential information and is subject to confidentiality. Its unauthorized use, copying and disclosure is prohibited. If you have received this message in error, please inform the sender and delete it, along with its attachments."
+  },
   "143904": {
     "last_action_number": 2,
     "status": "Aguardando",
