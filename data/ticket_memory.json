@@ -1,4 +1,9 @@
 {
+  "144160": {
+    "last_action_number": 1,
+    "status": "Novo",
+    "last_action": "1 - Ação criada por Vinicius Garrido em 16/06/2025 17:05Boa tarde, tudo bem?O prestador de serviços está tentando realizar a emissão de um documentoNFS-e e está retornando a mensagem de rejeição abaixo:*[#inv0328] - Mensagem retornada pela prefeitura: Código: 301, Mensagem:Object reference not set to an instance of an object.*Esse prestador já emitia NFS-e e começou a retornar este erro recentemente,poderiam me auxiliar na resolução?RPS: 3512Série: 8Data: 13/06/25Obrigado desde já,-- *AVISO DE CONFIDENCIALIDADE:*  Esta mensagem pode conter informações confidenciais e sujeitas a sigilo. A sua utilização, cópia e divulgação não autorizada são proibidas. Caso tenha recebido esta mensagem por engano, favor informar ao remetente e apagá-la, juntamente com seus anexos.***CONFIDENTIALITY NOTICE: *This message may contain confidential information and is subject to confidentiality. Its unauthorized use, copying and disclosure is prohibited. If you have received this message in error, please inform the sender and delete it, along with its attachments."
+  },
   "144118": {
     "last_action_number": 3,
     "status": "Em atendimento",
