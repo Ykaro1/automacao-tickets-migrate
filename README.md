@@ -1,45 +1,19 @@
-# Automação de Monitoramento de Tickets
+# Automação de Tickets Migrate
 
-Este script automatiza o monitoramento de tickets em um sistema, enviando notificações para o Slack quando houver atualizações.
+Este projeto automatiza a análise de tickets, enviando notificações para canais específicos do Slack com base no cliente associado ao ticket. Ele utiliza um webhook dinâmico para notificações de tickets e um webhook principal para notificações de sistema.
 
-## Configuração
+## Sobre o Projeto
 
-### Configuração no GitHub Actions
+O sistema foi desenvolvido para otimizar o processo de análise e notificação de tickets, garantindo que as informações relevantes sejam encaminhadas automaticamente para os canais apropriados no Slack. A automação reduz o tempo de resposta e melhora a eficiência do processo de atendimento.
 
-1. Acesse seu repositório no GitHub
-2. Vá para Settings > Secrets and variables > Actions
-3. Clique em "New repository secret"
-4. Adicione cada uma das variáveis necessárias como um secret
+## Funcionalidades
 
-### Configuração Local
+- Análise automática de tickets
+- Notificações personalizadas por cliente
+- Integração com Slack via webhooks
+- Sistema de notificações duplas (tickets e sistema)
 
-Para desenvolvimento local, você pode criar um arquivo `.env` na raiz do projeto com as variáveis necessárias.
-
-## Execução
-
-### Localmente
-
-1. Instale as dependências:
-```bash
-pip install -r requirements.txt
-```
-
-2. Execute o script:
-```bash
-python automacao_selenium.py
-```
-
-### No GitHub Actions
-
-O script será executado automaticamente de acordo com o agendamento configurado no arquivo de workflow.
-
-## Segurança
-
-- NUNCA comite credenciais diretamente no código
-- Use sempre variáveis de ambiente ou secrets do GitHub
-- Mantenha suas chaves de API seguras e não as compartilhe
-
-## Dependências
+## Tecnologias Utilizadas
 
 - Python 3.8+
 - Selenium
