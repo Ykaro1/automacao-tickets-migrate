@@ -1,4 +1,9 @@
 {
+  "144551": {
+    "last_action_number": 1,
+    "status": "Novo",
+    "last_action": "1 - Ação criada por Priscila Aline Lima em 20/06/2025 21:59Olá, time Migrate.Estamos com uma situação com o cliente *15211940000105*, que estáenfrentando dificuldades para emitir algumas notas de produto. Ao tentarrealizar a emissão da RPS *21869*, o sistema retorna a seguinte mensagem deerro:*\"Rejeição: Total dos pagamentos menor que o total da nota.\"*O que chama nossa atenção é que os mesmos produtos foram emitidosnormalmente na RPS *21886*, sem apresentar o erro. Fizemos uma comparaçãoentre as duas RPS e, aparentemente, não há diferenças relevantes quejustifiquem a rejeição.Poderiam, por favor, analisar o motivo dessa rejeição e nos orientar sobreo que precisa ser ajustado para que a emissão seja concluída?Ficamos no aguardo.Obrigada!Priscila LimaRelacionamento | Grandes Contas(11) 93950-8187Joinville | Rua Expedicionário Holz, 550, sala 1905São Paulo | Rua Bela Cintra, 1149 - 16º andarwww <http://www.novositeaqui.com.br/>.hyperlocal.com.br-- *AVISO DE CONFIDENCIALIDADE:*  Esta mensagem pode conter informações confidenciais e sujeitas a sigilo. A sua utilização, cópia e divulgação não autorizada são proibidas. Caso tenha recebido esta mensagem por engano, favor informar ao remetente e apagá-la, juntamente com seus anexos.***CONFIDENTIALITY NOTICE: *This message may contain confidential information and is subject to confidentiality. Its unauthorized use, copying and disclosure is prohibited. If you have received this message in error, please inform the sender and delete it, along with its attachments."
+  },
   "144550": {
     "last_action_number": 1,
     "status": "Novo",
