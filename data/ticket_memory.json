@@ -1,4 +1,9 @@
 {
+  "144861": {
+    "last_action_number": 1,
+    "status": "Novo",
+    "last_action": "1 - Ação criada por Bruna dos Reis em 25/06/2025 16:24Olá, equipe Migrate! Tudo bem?Estamos com um erro ao tentar emitir uma NFS-e para um cliente da nossa base. A nota foi rejeitada com a seguinte mensagem retornada pela prefeitura:Rejeitado - [#inv0328] - Mensagem retornada pela prefeitura: Código: 301, Mensagem: 427N1Erro de validacao do XSD: cvc-enumeration-valid: Value 1 is not facet-valid with respect to enumeration [99]. It must be a value from the enumeration.Segue print da tela para melhor visualização: https://prnt.sc/rGwdhu1vrPL1Cliente: ADA QUEMELCPF: 267.629.782-15Comanda: Nº0162Poderiam nos apoiar com a análise do caso e orientar como devemos proceder?Agradecemos desde já!Atenciosamente,-- Bruna dos ReisAnalista de Suporte à FranquiasJoinville | Rua Expedicionário Holz, 550, sala 1805São Paulo | Rua Bela Cintra, 1149 - 16º andar www.hyperlocal.com.br"
+  },
   "144836": {
     "last_action_number": 2,
     "status": "Aguardando",
