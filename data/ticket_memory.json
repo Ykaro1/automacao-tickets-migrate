@@ -1,7 +1,7 @@
 {
   "144836": {
     "last_action_number": 1,
-    "status": "Novo",
+    "status": "Em atendimento",
     "last_action": "1 - Ação criada por Bruno Marcos Tomasi em 25/06/2025 14:09Olá, tudo bem?Identificamos que a nota fiscal foi emitida na plataforma, porém o XMLcorrespondente não está sendo exibido na integradora fiscal.Já realizamos as seguintes validações:   -   A nota consta no Financeiro > Notas Fiscais    -   Verificamos a configuração fiscal do cliente    -   Tentamos atualizar o status manualmente, mas sem sucesso.   -   CNPJ: 54188729000162Solicitamos apoio para verificar se houve falha na comunicação com aMigrate ou se é necessário forçar a sincronização do documento.Se precisar de alguma informação adicional, fico à disposição para enviar.Obrigado!-- *AVISO DE CONFIDENCIALIDADE:*  Esta mensagem pode conter informações confidenciais e sujeitas a sigilo. A sua utilização, cópia e divulgação não autorizada são proibidas. Caso tenha recebido esta mensagem por engano, favor informar ao remetente e apagá-la, juntamente com seus anexos.***CONFIDENTIALITY NOTICE: *This message may contain confidential information and is subject to confidentiality. Its unauthorized use, copying and disclosure is prohibited. If you have received this message in error, please inform the sender and delete it, along with its attachments."
   },
   "144803": {
