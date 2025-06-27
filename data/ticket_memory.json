@@ -40,9 +40,9 @@
     "last_action": "3 - Ação criada por Hyperlocal Sul em 23/06/2025 19:44segue arquivo de uma nota do dia 13/06attJosias RodriguesEm seg., 23 de jun. de 2025 às 15:39, Equipe Relacionamento Brasil <atendimento@migrate.info> escreveu:>"
   },
   "144551": {
-    "last_action_number": 3,
-    "status": "Em atendimento",
-    "last_action": "3 - Ação criada por Priscila Aline Lima em 23/06/2025 13:53Bom dia, Laisa.Acredito que o erro não esteja ligado ao grupo de pagamentos, pois temosoutras notas fiscais emitidas com a mesma configuração. Exemplos de RPSemitidas somente nesse mês com mesmo valor, e mais formas de pagamento: *21842,21874, 21817.*Essa RPS 21869, teve somente 1 forma de pagamento, parcelada em 6x: [image: image.png]Permaneço à disposição.Em seg., 23 de jun. de 2025 às 08:29, Equipe Relacionamento Brasil <atendimento@migrate.info> escreveu:>"
+    "last_action_number": 4,
+    "status": "Aguardando",
+    "last_action": "4 - Ação criada por Cassiel Lima em 27/06/2025 14:56Bom dia, Priscila!Referente ao caso, acredito que esteja relacionado ao grupo do pagamento pelo seguinte motivo:Na nota que informou de exemplo, observei que todas os tipos de pagamento como cartão de crédito (03) estão preenchido com ao menos um valor (0.01) .A única forma de pagamento que não possui um valor de preenchimento é o tipo de pagamento como sem pagamento (90).Nesta nota em específico que esta gerando essa rejeição, todos as informações do tipo de pagamento estão como cartão de crédito, mas apenas uma possui o valor preenchido.Acredito que, para os campos que não possuem valores, será necessário informar o tipo de pagamento como sem pagamento (90), ou então, informar algum valor.Atenciosamente,"
   },
   "144550": {
     "last_action_number": 2,
