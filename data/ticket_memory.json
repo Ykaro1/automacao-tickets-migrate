@@ -1,9 +1,4 @@
 {
-  "145704": {
-    "last_action_number": 1,
-    "status": "Novo",
-    "last_action": "1 - Ação criada por Vinicius Garrido em 04/07/2025 14:16Bom dia, tudo bem?O estabelecimento comercial deseja enviar um e-mail com a NFS-e após aemissão, fiz um teste e notei que no log da nota fiscal está retornandoessa mensagem:[image: image.png]\"A empresa não possui caixa de envio de e-mails\".Como posso fazer para corrigir essa questão?Obrigado desde já!Att,Vinicius Garrido-- *AVISO DE CONFIDENCIALIDADE:*  Esta mensagem pode conter informações confidenciais e sujeitas a sigilo. A sua utilização, cópia e divulgação não autorizada são proibidas. Caso tenha recebido esta mensagem por engano, favor informar ao remetente e apagá-la, juntamente com seus anexos.***CONFIDENTIALITY NOTICE: *This message may contain confidential information and is subject to confidentiality. Its unauthorized use, copying and disclosure is prohibited. If you have received this message in error, please inform the sender and delete it, along with its attachments."
-  },
   "145669": {
     "last_action_number": 2,
     "status": "Em atendimento",
