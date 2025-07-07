@@ -1,4 +1,9 @@
 {
+  "145857": {
+    "last_action_number": 2,
+    "status": "Novo",
+    "last_action": "2 - Ação criada por Alan Augusto em 07/07/2025 20:16Olá, equipe Migrate.Tudo bem?Estamos com um problema na emissão de RPS para o cliente:   -   *CNPJ*: 12.088.323/0001-68 *Município*: Luís Eduardo Magalhães  BAA tentativa de envio está retornando a seguinte mensagem de erro:*Rejeitado - [#inv0328] - Mensagem retornada pela prefeitura: Código: 301,Mensagem: Autenticação inválida. O CPF deve ser informado.*Exemplo:*RPS 3*[image: image.png]O CPF do tomador do serviço está devidamente preenchido e validado, entãonão conseguimos identificar o motivo dessa rejeição por parte da prefeitura.Segue login de acesso ao site da prefeitura, caso precisem consultardiretamente por lá:   -   *CPF (login)*: 035.260.475-10   -   *Senha*: 12345Podem nos auxiliar, por favor?Fico no aguardo de um retorno.Atenciosamente,Alan AugustoEquipe Henrique RodriguesSuporte e Treinamento(11) 93940-8307Joinville | São Paulowww <http://www.novositeaqui.com.br/>.hyperlocal.com.br-- *AVISO DE CONFIDENCIALIDADE:*  Esta mensagem pode conter informações confidenciais e sujeitas a sigilo. A sua utilização, cópia e divulgação não autorizada são proibidas. Caso tenha recebido esta mensagem por engano, favor informar ao remetente e apagá-la, juntamente com seus anexos.***CONFIDENTIALITY NOTICE: *This message may contain confidential information and is subject to confidentiality. Its unauthorized use, copying and disclosure is prohibited. If you have received this message in error, please inform the sender and delete it, along with its attachments."
+  },
   "145738": {
     "last_action_number": 1,
     "status": "Novo",
