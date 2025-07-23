@@ -30,9 +30,9 @@
     "last_action": "3 - Ação criada por Patrick Eric Carvalho Declercq em 22/07/2025 18:49PSC @Bruno Marcos Tomasi <bruno.tomasi@hyperlocal.com.br>Em sex., 18 de jul. de 2025 às 11:02, Equipe Relacionamento Brasil <atendimento@migrate.info> escreveu:>"
   },
   "146773": {
-    "last_action_number": 8,
-    "status": "Aguardando",
-    "last_action": "8 - Ação criada por Cassiel Lima em 22/07/2025 20:29Boa tarde, Bruno!Realizei um teste com o RPS 10445, que foi o que nos autorizou. A princípio o item da lista de serviço deveria estar informado como 00.00, e estava sendo informado como 0.00.Já o código de tributação municipal estava com dois dígitos a mais, sendo necessário somente 7.Agora a nota está rejeitando com a seguinte mensagem:Mensagem retornada pela prefeitura: Código: E348, Mensagem: Emissao com servico eventual nao permitido pelo municipio. Correção: Informe um servico que nao seja eventual.Pelo o que pude analisar, o prazo de utilização desse serviço foi expirado. Conseguiria verificar sobre essa natureza da operação, por gentileza.Atenciosamente,"
+    "last_action_number": 9,
+    "status": "Em atendimento",
+    "last_action": "9 - Ação criada por Bruno Marcos Tomasi em 23/07/2025 11:43Bom dia Cassiel !Agradeço seu retorno e já realizei as alterações na nossa plataforma.Agora aguardo o contato da cliente para confirmação da 'natureza daoperação'Assim que obter mais informações lhe retorno.Em ter., 22 de jul. de 2025 às 17:30, Equipe Relacionamento Brasil <atendimento@migrate.info> escreveu:>"
   },
   "146714": {
     "last_action_number": 8,
