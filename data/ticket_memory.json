@@ -1,4 +1,14 @@
 {
+  "147362": {
+    "last_action_number": 1,
+    "status": "Novo",
+    "last_action": "1 - Ação criada por Patrick Eric Carvalho Declercq em 24/07/2025 20:51PSC @Priscila Lima <priscila.lima@hyperlocal.com.br>Em sex., 27 de jun. de 2025 às 11:28, Patrick Eric Carvalho Declercq <patrick.declercq@hyperlocal.com.br> escreveu:> Olá, tudo bem?>> Estou em contato para solicitar apoio na resolução de um problema> recorrente na emissão de nota fiscal de serviço (NFS-e) para um cliente que> atua como *Salão Parceiro*. A situação é a seguinte:>> ?? *Resumo do caso:*>> Desde dezembro de 2024, o salão não consegue mais emitir as notas fiscais> no formato com *dedução da comissão dos profissionais*, como era feito> anteriormente. Segundo a cliente, até novembro do ano passado a nota era> emitida normalmente com a dedução da parte não tributável (referente à> comissão dos profissionais), conforme determina a Lei do Salão Parceiro.>> Porém, após mudanças na prefeitura (possivelmente na estrutura ou layout> da nota), a emissão passou a falhar. O sistema atual que utilizamos só> permite selecionar \"sim\" ou \"não\" no campo de dedução, e ao marcar \"sim\", a> nota apresenta erro e não é finalizada.>> ??? A cliente nos informou via áudio que:>>    ->>    O modelo da nota precisa considerar deduções proporcionais ao serviço:>    ex. corte = 50%, escova = 40%, coloração = 20% >    ->>    Todos esses serviços constam no mesmo RPS, pois são feitos no mesmo>    dia pelo mesmo profissional >    ->>    As notas anteriores eram emitidas corretamente com esse modelo >    ->>    Ela depende da emissão correta desse tipo de nota para seguir com o>    uso do sistema.>> Já validamos os dados cadastrais, e estamos prontos para fornecer:>>    ->>    Certificado digital A1 (.pfx) e senha >    ->>    Login de acesso ao portal da prefeitura.>> ?? *Necessidade:*> Precisamos de orientação ou ajuste no schema, layout ou parâmetros para> que a nota possa ser emitida no modelo *com dedução*, conforme prevê o> regime de Salão Parceiro.>> Certificado digital, e nota em anexo>> Login de acesso:24.341.556/0001-00 Senha: 110513Ac>> Em qui., 26 de jun. de 2025 às 09:16, Equipe Relacionamento Brasil <> atendimento@migrate.info> escreveu:>>>"
+  },
+  "147361": {
+    "last_action_number": 1,
+    "status": "Novo",
+    "last_action": "1 - Ação criada por Patrick Eric Carvalho Declercq em 24/07/2025 20:48PSC @Priscila Lima <priscila.lima@hyperlocal.com.br>Em qui., 3 de jul. de 2025 às 17:42, Equipe Relacionamento Brasil <atendimento@migrate.info> escreveu:>"
+  },
   "147352": {
     "last_action_number": 2,
     "status": "Aguardando",
