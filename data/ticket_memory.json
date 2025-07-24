@@ -15,9 +15,9 @@
     "last_action": "3 - Ação criada por Luan Victor de Ramos Luciano em 23/07/2025 14:10Olá,Sim, autorizo.Atenciosamente,Luan LucianoEm qua., 23 de jul. de 2025 às 11:06, Equipe Relacionamento Brasil <atendimento@migrate.info> escreveu:>"
   },
   "147093": {
-    "last_action_number": 5,
-    "status": "Em atendimento",
-    "last_action": "5 - Ação criada por Alan Augusto em 23/07/2025 18:50O cliente informou que só pode cancelar essas 6 notas mediantejustificativa.Eles querem uma formalização por parte da Migrate informando que houve umainstabilidade que ocasionou essas 6 notas para assim poderem ter umdocumento para validar o cancelamento deles.E-mails que precisam receber essa formalização:verleiemanacab@hotmail.comzania.kuelle@franquias.hyperlocal.com.bralan.augusto@franquias.hyperlocal.com.brAtenciosamente,Alan AugustoEquipe Henrique RodriguesSuporte e Treinamento(11) 93940-8307Joinville | São Paulowww <http://www.novositeaqui.com.br/>.hyperlocal.com.brEm qua., 23 de jul. de 2025 às 15:16, Equipe Relacionamento Brasil <atendimento@migrate.info> escreveu:>"
+    "last_action_number": 6,
+    "status": "Aguardando",
+    "last_action": "6 - Ação criada por Cassiel Lima em 24/07/2025 14:36Bom dia, Alan!Analisei a situação novamente, a princípio essas notas não foram autorizadas por excesso de requisições. Consultei os logs dessas notas, cada log desse é referente a um lote de notas enviado a prefeitura.Sendo assim, essas notas não tiveram um retorno pois como teve um excesso de requisições, a conexão teria recebido um timeout.Situação das notas:Requisições desses lotes:Como o contribuinte está com a empresa configurada no modo síncrono, que exige uma resposta imediata, essas notas não tiveram seus status retornados. Como sugestão, para o tipo de emissão em lote, recomendamos que a empresa esteja configurada no modo assíncrono para que casos assim não voltem a ocorrer.Para o cancelamento, ele poderá informar que o serviço não foi prestado, igualmente como seria se fosse para web service, pois de fato esses serviços não deveriam ter sido prestados.  Atenciosamente,"
   },
   "146967": {
     "last_action_number": 2,
