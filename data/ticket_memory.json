@@ -1,4 +1,9 @@
 {
+  "148095": {
+    "last_action_number": 1,
+    "status": "Novo",
+    "last_action": "1 - Ação criada por Jessica de Padua Adivo Lima em 31/07/2025 21:15Olá, boa tarde!Cliente está tendo problema para emissão de nota fiscal produto,configuração do sistema está tudo ok.[image: image.png]Cliente está com esse erro Rejeição: [1840] Element 'UF_dest': [facet'enumeration'] The value 'sp' is not an element of the set {'AC', 'AL','AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA','PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP','TO'}.Poderiam verificar, por favor.Atenciosamente,*Jessica Lima**Analista | Atendimento**Joinville | Rua Expedicionário Holz, 550, sala 1805**São Paulo | Rua Bela Cintra, 1149 - 16º andar**www.hyperlocal.com.br <http://www.hyperlocal.com.br>*-- *AVISO DE CONFIDENCIALIDADE:*  Esta mensagem pode conter informações confidenciais e sujeitas a sigilo. A sua utilização, cópia e divulgação não autorizada são proibidas. Caso tenha recebido esta mensagem por engano, favor informar ao remetente e apagá-la, juntamente com seus anexos.***CONFIDENTIALITY NOTICE: *This message may contain confidential information and is subject to confidentiality. Its unauthorized use, copying and disclosure is prohibited. If you have received this message in error, please inform the sender and delete it, along with its attachments."
+  },
   "148075": {
     "last_action_number": 2,
     "status": "Em atendimento",
