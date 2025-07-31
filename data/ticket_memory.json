@@ -1,4 +1,9 @@
 {
+  "148075": {
+    "last_action_number": 1,
+    "status": "Novo",
+    "last_action": "1 - Ação criada por Aryane de Carvalho Ducatti em 31/07/2025 19:24Boa tarde, tudo bem?Estou com um cliente do município de Criciúma, do *CNPJ **15427220000173 *emque está apresentando este erro :*Rejeitado - [#inv0328] - Mensagem retornada pela prefeitura: Código: E228,Mensagem: Para esta prestação de serviços a alíquota do ISSQN éobrigatória. Pode estar relacionado à tag ValAliqISS. Correção: Informe umvalor percentual da alíquota de ISSQN, que deve ser maior ou igual a 2% emenor ou igual a 5%. - Este município possui emissão sequencial e enquantoo RPS 62351 não for corrigido, outras notas não serão aceitas pelaprefeitura.**Ao verificar na Migrate que a última nota emitida, estava com estaalíquota *[image: image.png]Porém o cliente entrou em contato com a sua contabilidade e a mesmainformou que o valor seria esse.[image: image.png]Porém mesmo informado esses dois valores, está apresentando o mesmo erro.Poderiam verificar por gentileza, e efetuar a tentativa para emitir estanota ??*Aryane de Carvalho Ducatti*Analista de Suporte a FranquiasJoinville | Rua Expedicionário Holz, 550, sala 1805São Paulo | Rua Bela Cintra, 1149 - 16º andarwww <http://www.novositeaqui.com.br/>.hyperlocal.com.br-- *AVISO DE CONFIDENCIALIDADE:*  Esta mensagem pode conter informações confidenciais e sujeitas a sigilo. A sua utilização, cópia e divulgação não autorizada são proibidas. Caso tenha recebido esta mensagem por engano, favor informar ao remetente e apagá-la, juntamente com seus anexos.***CONFIDENTIALITY NOTICE: *This message may contain confidential information and is subject to confidentiality. Its unauthorized use, copying and disclosure is prohibited. If you have received this message in error, please inform the sender and delete it, along with its attachments."
+  },
   "148053": {
     "last_action_number": 3,
     "status": "Em atendimento",
